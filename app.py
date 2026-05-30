@@ -84,15 +84,23 @@ elif menu == "👥 User Directory":
 elif menu == "➕ Tambah Laptop":
     st.title("➕ Tambah Laptop Baru")
     with st.form("f_add"):
-        m = st.text_input("Model"); sn = st.text_input("SN")
-        bo = st.selectbox("BU Owner", BU_OPTIONS); bu = st.selectbox("BU User", BU_OPTIONS)
-        jt = st.text_input("Job Title"); us = st.text_input("User")
+        m = st.text_input("Model")
+        sn = st.text_input("SN")
+        bo = st.selectbox("BU Owner", BU_OPTIONS)
+        bu = st.selectbox("BU User", BU_OPTIONS)
+        jt = st.text_input("Job Title")
+        us = st.text_input("User")
         stt = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"])
-        tb = st.number_input("Tahun Beli", 2015, 2030, 2026); nt = st.text_area("Notes")
+        tb = st.number_input("Tahun Beli", 2015, 2030, 2026)
+        nt = st.text_area("Notes")
         if st.form_submit_button("Simpan"):
             nr = {"Model": m, "Serial Number": sn, "Bu Owner": bo, "Bu User": bu, "Job Title": jt, "User": us, "Status": stt, "Tahun Beli": tb, "Notes": nt}
             up_df = pd.concat([df, pd.DataFrame([nr])], ignore_index=True)
-            if save_to_github(up_df): st.session_state.df = up_df; add_log("TAMBAH", sn); st.success("Tersimpan!"); st.rerun()
+            if save_to_github(up_df): 
+                st.session_state.df = up_df
+                add_log("TAMBAH", sn)
+                st.success("Tersimpan!")
+                st.rerun()
 
 elif menu == "✏️ Edit Data":
     st.title("✏️ Edit Data Laptop")
@@ -110,7 +118,39 @@ elif menu == "✏️ Edit Data":
         ent = st.text_area("Notes", value=row.get('Notes', ''))
         if st.form_submit_button("Simpan Perubahan"):
             up_df = df.copy()
-            up_df.at[idx, 'Model'] = em; up_df.at[idx, 'Bu Owner'] = ebo; up_df.at[idx, 'Bu User'] = ebu
-            up_df.at[idx, 'Job Title'] = ejt; up_df.at[idx, 'User'] = eus; up_df.at[idx, 'Status'] = est
-            up_df.at[idx, 'Tahun Beli'] = etb; up_df.at[idx, 'Notes'] = ent
-            if save_to_github(
+            up_df.at[idx, 'Model'] = em
+            up_df.at[idx, 'Bu Owner'] = ebo
+            up_df.at[idx, 'Bu User'] = ebu
+            up_df.at[idx, 'Job Title'] = ejt
+            up_df.at[idx, 'User'] = eus
+            up_df.at[idx, 'Status'] = est
+            up_df.at[idx, 'Tahun Beli'] = etb
+            up_df.at[idx, 'Notes'] = ent
+            if save_to_github(up_df): 
+                st.session_state.df = up_df
+                add_log("EDIT", s_sn)
+                st.success("Terupdate!")
+                st.rerun()
+
+elif menu == "❌ Hapus Laptop":
+    st.title("❌ Hapus Laptop")
+    s_del = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
+    row = df[df['Serial Number'] == s_del].iloc[0]
+    st.warning("⚠️ Data yang akan dihapus:")
+    st.write(f"**Model:** {row['Model']} | **User:** {row['User']} | **BU:** {row['Bu Owner']}")
+    if st.button("Ya, Hapus Permanen"):
+        up_df = df.drop(df[df['Serial Number'] == s_del].index[0]).reset_index(drop=True)
+        if save_to_github(up_df): 
+            st.session_state.df = up_df
+            add_log("HAPUS", s_del)
+            st.rerun()
+
+elif menu == "📝 Cetak BAST":
+    st.title("📝 Dokumen BAST")
+    p_sn = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
+    li = df[df['Serial Number'] == p_sn].iloc[0]
+    st.text_area("Pratinjau BAST", f"BAST untuk {li.get('User')}\nModel: {li.get('Model')}\nSN: {li.get('Serial Number')}", height=300)
+
+elif menu == "📋 Audit Log":
+    st.title("📋 Audit Log")
+    for log in st.session_state.audit_log: st.write(log)
