@@ -9,6 +9,7 @@ st.set_page_config(page_title="Dashboard IT Asset Umara Group", layout="wide")
 
 GITHUB_REPO = "imam1199/Dashboard-laptop-Office"  
 FILE_PATH = "laporan_laptop_terbaru.csv"
+BU_OPTIONS = ["UNB", "UCR", "RNB", "LBI", "SMI", "UMK"]
 
 # --- CONFIG & LOAD DATA ---
 try:
@@ -84,7 +85,7 @@ elif menu == "➕ Tambah Laptop":
     st.title("➕ Tambah Laptop Baru")
     with st.form("f_add"):
         m = st.text_input("Model"); sn = st.text_input("SN")
-        bo = st.text_input("BU Owner"); bu = st.text_input("BU User")
+        bo = st.selectbox("BU Owner", BU_OPTIONS); bu = st.selectbox("BU User", BU_OPTIONS)
         jt = st.text_input("Job Title"); us = st.text_input("User")
         stt = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"])
         tb = st.number_input("Tahun Beli", 2015, 2030, 2026); nt = st.text_area("Notes")
@@ -100,8 +101,8 @@ elif menu == "✏️ Edit Data":
     row = df.loc[idx]
     with st.form("f_ed"):
         em = st.text_input("Model", value=row.get('Model', ''))
-        ebo = st.text_input("BU Owner", value=row.get('Bu Owner', ''))
-        ebu = st.text_input("BU User", value=row.get('Bu User', ''))
+        ebo = st.selectbox("BU Owner", BU_OPTIONS, index=BU_OPTIONS.index(row.get('Bu Owner')) if row.get('Bu Owner') in BU_OPTIONS else 0)
+        ebu = st.selectbox("BU User", BU_OPTIONS, index=BU_OPTIONS.index(row.get('Bu User')) if row.get('Bu User') in BU_OPTIONS else 0)
         est = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"], index=["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"].index(row.get('Status', 'Tersedia')))
         if st.form_submit_button("Simpan Perubahan"):
             up_df = df.copy()
