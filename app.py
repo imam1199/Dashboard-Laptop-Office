@@ -117,7 +117,7 @@ if menu == "📊 Dashboard & Analytics":
             m_c.columns = ['Model', 'Total']
             st.plotly_chart(px.bar(m_c, x='Model', y='Total', color='Model'), use_container_width=True)
 
-# 2. USER DIRECTORY (Tampilan Sejajar)
+# 2. USER DIRECTORY
 elif menu == "👥 User Directory":
     st.title("👥 User Directory & Histori")
     if 'User' in df.columns and len(df) > 0:
@@ -126,13 +126,10 @@ elif menu == "👥 User Directory":
             s_user = st.selectbox("🎯 Pilih Nama Karyawan:", list_users)
             u_data = df[df['User'] == s_user]
             
-            st.markdown("---")
-            # Kotak Sejajar menggunakan metric
             p1, p2, p3 = st.columns(3)
-            p1.metric(label="👤 Nama Karyawan", value=s_user)
-            p2.metric(label="💼 Jabatan", value=u_data.iloc[0].get('Job Title', '-'))
-            p3.metric(label="💻 Aset Pegang", value=f"{len(u_data)} Unit")
-            st.markdown("---")
+            p1.info(f"👤 **User:**\n### {s_user}")
+            p2.success(f"💼 **Jabatan:**\n### {u_data.iloc[0].get('Job Title', '-')} ({u_data.iloc[0].get('Bu User', '-')})")
+            p3.warning(f"💻 **Aset Pegang:**\n### {len(u_data)} Unit")
                 
             st.dataframe(u_data[['Model', 'Serial Number', 'Bu Owner', 'Status', 'Notes', 'Tahun Beli']], use_container_width=True, hide_index=True)
     else: st.warning("Data kosong.")
