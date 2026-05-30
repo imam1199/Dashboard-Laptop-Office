@@ -9,7 +9,8 @@ st.set_page_config(page_title="Dashboard IT Asset Umara Group", layout="wide")
 
 GITHUB_REPO = "imam1199/Dashboard-laptop-Office"  
 FILE_PATH = "laporan_laptop_terbaru.csv"
-BU_OPTIONS = ["UNB", "UCR", "RNB", "LBI", "SMI", "UMK"]
+LOG_PATH = "audit_log.csv"
+BU_OPTIONS = ["UNB", "UCR", "RNB", "LBI", "SMI", "UMK"] # List BU lo
 
 # --- CONFIG & LOAD DATA ---
 try:
@@ -17,17 +18,17 @@ try:
 except:
     GITHUB_TOKEN = None
 
-def load_data():
+def load_data(path):
     try:
-        df = pd.read_csv(FILE_PATH, sep=";").fillna("")
+        df = pd.read_csv(path, sep=";").fillna("")
         df.columns = df.columns.str.strip().str.title()
         return df
     except:
-        return pd.DataFrame(columns=["Model", "Serial Number", "Bu Owner", "Bu User", "Job Title", "User", "Status", "Notes", "Tahun Beli"])
+        return pd.DataFrame()
 
-def save_to_github(dataframe):
+def save_to_github(dataframe, path):
     if not GITHUB_TOKEN: return False
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     res = requests.get(url, headers=headers)
     sha = res.json().get("sha", "") if res.status_code == 200 else ""
@@ -36,13 +37,16 @@ def save_to_github(dataframe):
     payload = {"message": "Update Data", "content": encoded_content, "sha": sha if sha else None}
     return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
 
-if 'df' not in st.session_state: st.session_state.df = load_data()
-if 'audit_log' not in st.session_state: st.session_state.audit_log = []
+if 'df' not in st.session_state: st.session_state.df = load_data(FILE_PATH)
+if 'audit_df' not in st.session_state: st.session_state.audit_df = load_data(LOG_PATH)
 df = st.session_state.df
 
 def add_log(action, detail):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.session_state.audit_log.insert(0, f"⏱️ [{ts}] - {action}: {detail}")
+    new_log = pd.DataFrame([{"Timestamp": ts, "Action": action, "Detail": detail}])
+    updated_logs = pd.concat([new_log, st.session_state.audit_df], ignore_index=True)
+    if save_to_github(updated_logs, LOG_PATH):
+        st.session_state.audit_df = updated_logs
 
 # --- SIDEBAR ---
 st.sidebar.title("💻 IT Asset Umara Group")
@@ -93,13 +97,13 @@ elif menu == "➕ Tambah Laptop":
         stt = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"])
         tb = st.number_input("Tahun Beli", 2015, 2030, 2026)
         nt = st.text_area("Notes")
-        if st.form_submit_button("Simpan"):
+        if st.form_submit_button("💾 Simpan Data"):
             nr = {"Model": m, "Serial Number": sn, "Bu Owner": bo, "Bu User": bu, "Job Title": jt, "User": us, "Status": stt, "Tahun Beli": tb, "Notes": nt}
             up_df = pd.concat([df, pd.DataFrame([nr])], ignore_index=True)
-            if save_to_github(up_df): 
+            if save_to_github(up_df, FILE_PATH): 
                 st.session_state.df = up_df
-                add_log("TAMBAH", sn)
-                st.success("Tersimpan!")
+                add_log("TAMBAH", f"SN: {sn}")
+                st.success("Data berhasil ditambahkan!")
                 st.rerun()
 
 elif menu == "✏️ Edit Data":
@@ -116,41 +120,34 @@ elif menu == "✏️ Edit Data":
         est = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"], index=["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"].index(row.get('Status', 'Tersedia')) if row.get('Status') in ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"] else 0)
         etb = st.number_input("Tahun Beli", 2015, 2030, int(row.get('Tahun Beli', 2026)))
         ent = st.text_area("Notes", value=row.get('Notes', ''))
-        if st.form_submit_button("Simpan Perubahan"):
+        if st.form_submit_button("✅ Simpan Perubahan"):
             up_df = df.copy()
-            up_df.at[idx, 'Model'] = em
-            up_df.at[idx, 'Bu Owner'] = ebo
-            up_df.at[idx, 'Bu User'] = ebu
-            up_df.at[idx, 'Job Title'] = ejt
-            up_df.at[idx, 'User'] = eus
-            up_df.at[idx, 'Status'] = est
-            up_df.at[idx, 'Tahun Beli'] = etb
-            up_df.at[idx, 'Notes'] = ent
-            if save_to_github(up_df): 
+            up_df.at[idx, 'Model'] = em; up_df.at[idx, 'Bu Owner'] = ebo; up_df.at[idx, 'Bu User'] = ebu
+            up_df.at[idx, 'Job Title'] = ejt; up_df.at[idx, 'User'] = eus; up_df.at[idx, 'Status'] = est
+            up_df.at[idx, 'Tahun Beli'] = etb; up_df.at[idx, 'Notes'] = ent
+            if save_to_github(up_df, FILE_PATH): 
                 st.session_state.df = up_df
-                add_log("EDIT", s_sn)
-                st.success("Terupdate!")
-                st.rerun()
+                add_log("EDIT", f"SN: {s_sn}")
+                st.success("Data berhasil diupdate!"); st.rerun()
 
 elif menu == "❌ Hapus Laptop":
     st.title("❌ Hapus Laptop")
     s_del = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
     row = df[df['Serial Number'] == s_del].iloc[0]
-    st.warning("⚠️ Data yang akan dihapus:")
-    st.write(f"**Model:** {row['Model']} | **User:** {row['User']} | **BU:** {row['Bu Owner']}")
-    if st.button("Ya, Hapus Permanen"):
+    st.warning(f"⚠️ Konfirmasi hapus data: {row['Model']} (SN: {s_del})")
+    if st.button("🗑️ Hapus Permanen"):
         up_df = df.drop(df[df['Serial Number'] == s_del].index[0]).reset_index(drop=True)
-        if save_to_github(up_df): 
+        if save_to_github(up_df, FILE_PATH): 
             st.session_state.df = up_df
-            add_log("HAPUS", s_del)
+            add_log("HAPUS", f"SN: {s_del}")
             st.rerun()
 
 elif menu == "📝 Cetak BAST":
     st.title("📝 Dokumen BAST")
     p_sn = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
     li = df[df['Serial Number'] == p_sn].iloc[0]
-    st.text_area("Pratinjau BAST", f"BAST untuk {li.get('User')}\nModel: {li.get('Model')}\nSN: {li.get('Serial Number')}", height=300)
+    st.text_area("Pratinjau BAST", f"BAST untuk {li.get('User')}\nModel: {li.get('Model')}\nSN: {li.get('Serial Number')}\nBU: {li.get('Bu User')}", height=300)
 
 elif menu == "📋 Audit Log":
     st.title("📋 Audit Log")
-    for log in st.session_state.audit_log: st.write(log)
+    st.dataframe(st.session_state.audit_df, use_container_width=True)
