@@ -25,14 +25,13 @@ def load_data():
         df.columns = df.columns.str.title()
         
         # Sikat spasi gaib di isi kolom krusial
-        for col in ['Status', 'Model', 'Serial Number', 'Bu Owner', 'Bu User']:
+        for col in ['Status', 'Model', 'Serial Number', 'Bu Owner', 'Bu User', 'User', 'Job Title']:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip()
                 
-        # FITUR 1: Tambah data umur depresiasi bayangan jika belum ada kolom tahun beli
-        # (Kita asumsikan default pembelian atau input manual ke depan)
+        # Buat kolom Tahun Beli bawaan jika belum ada di file CSV
         if 'Tahun Beli' not in df.columns:
-            df['Tahun Beli'] = 2023 # Default tahun buat laptop lama
+            df['Tahun Beli'] = 2023
             
         return df
     except:
@@ -70,7 +69,7 @@ if 'audit_log' not in st.session_state:
 
 df = st.session_state.df
 
-# Tambahkan log bawaan biar gak kosong pas di-refresh
+# Fungsi mencatat log aktivitas
 def add_log(action, detail):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     st.session_state.audit_log.insert(0, f"⏱️ [{timestamp}] - {action}: {detail}")
@@ -79,6 +78,7 @@ def add_log(action, detail):
 st.sidebar.title("💻 IT Asset Umara Group")
 menu = st.sidebar.radio("Pilih Menu:", [
     "📊 Dashboard & Analytics", 
+    "👥 User Directory (Profil)",
     "➕ Tambah Laptop", 
     "✏️ Edit / Update Data", 
     "❌ Hapus Laptop", 
@@ -91,7 +91,6 @@ if menu == "📊 Dashboard & Analytics":
     st.title("📊 Dashboard IT Asset Umara Group")
     st.write("Sistem Monitoring, Analisis, dan Manajemen Inventaris Laptop secara Real-Time.")
     
-    # Ringkasan Angka Utama
     st.markdown("### 📈 Ringkasan Status Laptop")
     total_laptop = len(df)
     
@@ -100,7 +99,7 @@ if menu == "📊 Dashboard & Analytics":
     
     dipakai, tersedia, perbaikan, rusak = get_count('Pakai'), get_count('Tersedia'), get_count('Perbaikan'), get_count('Rusak')
     
-    # HITUNG DEPRESIASI UMUR LAPTOP (Asumsi masa pakai ideal = 3 tahun)
+    # Hitung umur aset laptop
     tahun_sekarang = datetime.now().year
     df['Umur Aset (Tahun)'] = tahun_sekarang - df['Tahun Beli'].astype(int, errors='ignore')
     perlu_ganti = len(df[df['Umur Aset (Tahun)'] >= 3])
@@ -115,7 +114,6 @@ if menu == "📊 Dashboard & Analytics":
     
     st.markdown("---")
     
-    # FITUR FILTER CEPAT BERDASARKAN BU
     st.subheader("🔍 Cari & Filter Data")
     f_col1, f_col2, f_col3 = st.columns([1, 1, 2])
     
@@ -128,7 +126,6 @@ if menu == "📊 Dashboard & Analytics":
     with f_col3:
         search = st.text_input("Pencarian Fleksibel (Ketik Model/SN/User):")
         
-    # Proses filtering data
     display_df = df.copy()
     if selected_bu_owner != "Semua":
         display_df = display_df[display_df['Bu Owner'] == selected_bu_owner]
@@ -137,9 +134,9 @@ if menu == "📊 Dashboard & Analytics":
     if search:
         display_df = display_df[display_df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
         
-    # Tampilkan kolom nomor urut (1, 2, 3...)
     if len(display_df) > 0:
         numbered_df = display_df.copy()
+        numbered_df.columns = numbered_df.columns.str.strip()
         numbered_df.insert(0, "No", range(1, len(numbered_df) + 1))
     else:
         numbered_df = display_df
@@ -155,7 +152,6 @@ if menu == "📊 Dashboard & Analytics":
         }
     )
     
-    # Tombol Download Data
     csv_to_download = display_df.to_csv(index=False, sep=";").encode('utf-8')
     st.download_button(
         label="📥 Download Hasil Filter ke Excel (CSV)", data=csv_to_download,
@@ -163,8 +159,6 @@ if menu == "📊 Dashboard & Analytics":
     )
         
     st.markdown("---")
-    
-    # FITUR GRAFIK PIE & BAR BERDAMPINGAN (PLOTLY INTERAKTIF)
     st.subheader("📊 Visualisasi Analytics Interaktif")
     chart_col1, chart_col2 = st.columns(2)
     
@@ -176,7 +170,7 @@ if menu == "📊 Dashboard & Analytics":
         st.plotly_chart(fig_pie, use_container_width=True)
         
     with chart_col2:
-        st.markdown("##### 🔹 Top 5 Model Laptop Terbanyak di Kantor")
+        st.markdown("##### 🔹 Top 5 Model Laptop Terbanyak")
         if 'Model' in df.columns and len(df) > 0:
             model_counts = df['Model'].value_counts().head(5).reset_index()
             model_counts.columns = ['Model Laptop', 'Total']
@@ -184,7 +178,54 @@ if menu == "📊 Dashboard & Analytics":
             fig_bar.update_layout(showlegend=False, margin=dict(t=20, b=20, l=20, r=20), height=300)
             st.plotly_chart(fig_bar, use_container_width=True)
 
-# 2. MENU TAMBAH LAPTOP
+# 2. FITUR BARU: MENU USER DIRECTORY (PROFIL PENGGUNA)
+elif menu == "👥 User Directory (Profil)":
+    st.title("👥 User Directory & Histori Aset Karyawan")
+    st.write("Lihat profil lengkap karyawan Umara Group beserta daftar laptop yang mereka gunakan.")
+    
+    # Ambil list nama pengguna unik yang tidak kosong
+    if 'User' in df.columns and len(df) > 0:
+        list_users = sorted([u for u in df['User'].unique() if u.strip() != ""])
+        
+        if not list_users:
+            st.warning("Belum ada nama User yang terdaftar di database laptop.")
+        else:
+            selected_user = st.selectbox("🎯 Pilih Nama Karyawan / User:", list_users)
+            
+            # Filter baris data khusus user yang dipilih
+            user_data = df[df['User'] == selected_user]
+            
+            # Ambil sampel informasi jabatan dan BU (dari baris pertama data si user)
+            info_job = user_data.iloc[0].get('Job Title', '-')
+            info_bu = user_data.iloc[0].get('Bu User', '-')
+            total_device = len(user_data)
+            
+            # Tampilkan kartu profil kecil ala HRIS/Sistem Management Aset Profesional
+            st.markdown("---")
+            p_col1, p_col2, p_col3 = st.columns(3)
+            with p_col1:
+                st.info(f"👤 **Nama Karyawan:**\n### {selected_user}")
+            with p_col2:
+                st.success(f"💼 **Jabatan & Divisi (BU):**\n### {info_job} ({info_bu})")
+            with p_col3:
+                st.warning(f"💻 **Jumlah Laptop Dipegang:**\n### {total_device} Unit")
+                
+            st.markdown("#### 📋 Daftar Laptop yang Digunakan oleh User Ini")
+            
+            # Format tabel agar rapi khusus menampilkan spek laptopnya saja
+            user_table = user_data[['Model', 'Serial Number', 'Bu Owner', 'Status', 'Notes', 'Tahun Beli']].copy()
+            user_table.insert(0, "No", range(1, len(user_table) + 1))
+            
+            st.dataframe(
+                user_table,
+                use_container_width=True,
+                hide_index=True,
+                column_config={"Tahun Beli": st.column_config.NumberColumn("Tahun Beli", format="%d")}
+            )
+    else:
+        st.warning("Database masih kosong, belum bisa menampilkan direktori pengguna.")
+
+# 3. MENU TAMBAH LAPTOP
 elif menu == "➕ Tambah Laptop":
     st.title("➕ Tambah Laptop Baru")
     with st.form("form_tambah"):
@@ -206,17 +247,17 @@ elif menu == "➕ Tambah Laptop":
                 new_row = {col: "" for col in df.columns}
                 new_row['Model'], new_row['Serial Number'] = model.strip(), sn.strip()
                 new_row['Bu Owner'], new_row['Bu User'] = bu_owner.strip(), bu_user.strip()
-                new_row['Job Title'], new_row['User'], new_row['Status'] = job_title, user, status
+                new_row['Job Title'], new_row['User'], new_row['Status'] = job_title.strip(), user.strip(), status
                 new_row['Tahun Beli'], new_row['Notes'] = thn_beli, notes
                 
                 updated_df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                 if save_to_github(updated_df):
                     st.session_state.df = updated_df
-                    add_log("TAMBAH LAPTOP", f"Menambahkan laptop {model.strip()} dengan SN {sn.strip()}")
+                    add_log("TAMBAH LAPTOP", f"Menambahkan laptop {model.strip()} dengan SN {sn.strip()} untuk user {user.strip()}")
                     st.success("Berhasil disimpan permanen ke Cloud!")
                     st.rerun()
 
-# 3. MENU EDIT / UPDATE DATA
+# 4. MENU EDIT / UPDATE DATA
 elif menu == "✏️ Edit / Update Data":
     st.title("✏️ Edit & Update Data Laptop")
     if len(df) == 0: st.warning("Belum ada data laptop.")
@@ -230,6 +271,7 @@ elif menu == "✏️ Edit / Update Data":
             edit_model = st.text_input("Model Laptop", value=data_laptop.get('Model', ''))
             edit_bu_owner = st.text_input("BU Owner", value=data_laptop.get('Bu Owner', ''))
             edit_bu_user = st.text_input("BU User", value=data_laptop.get('Bu User', ''))
+            edit_job_title = st.text_input("Job Title", value=data_laptop.get('Job Title', ''))
             edit_user = st.text_input("Nama User", value=data_laptop.get('User', ''))
             edit_status = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"], index=["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"].index(data_laptop.get('Status', 'Tersedia')))
             edit_notes = st.text_area("Notes / Catatan", value=data_laptop.get('Notes', ''))
@@ -237,17 +279,21 @@ elif menu == "✏️ Edit / Update Data":
             save_changes = st.form_submit_button("Simpan Perubahan")
             if save_changes:
                 updated_df = df.copy()
-                updated_df.at[idx, 'Model'], updated_df.at[idx, 'Status'] = edit_model.strip(), edit_status
-                updated_df.at[idx, 'Bu Owner'], updated_df.at[idx, 'Bu User'] = edit_bu_owner, edit_bu_user
-                updated_df.at[idx, 'User'], updated_df.at[idx, 'Notes'] = edit_user, edit_notes
+                updated_df.at[idx, 'Model'] = edit_model.strip()
+                updated_df.at[idx, 'Status'] = edit_status
+                updated_df.at[idx, 'Bu Owner'] = edit_bu_owner.strip()
+                updated_df.at[idx, 'Bu User'] = edit_bu_user.strip()
+                updated_df.at[idx, 'Job Title'] = edit_job_title.strip()
+                updated_df.at[idx, 'User'] = edit_user.strip()
+                updated_df.at[idx, 'Notes'] = edit_notes
                 
                 if save_to_github(updated_df):
                     st.session_state.df = updated_df
-                    add_log("EDIT DATA", f"Mengubah data laptop SN {selected_sn} (Status baru: {edit_status})")
+                    add_log("EDIT DATA", f"Mengubah data laptop SN {selected_sn} (User Baru: {edit_user.strip()}, Status baru: {edit_status})")
                     st.success("Perubahan berhasil dikirim ke Cloud!")
                     st.rerun()
 
-# 4. MENU HAPUS LAPTOP
+# 5. MENU HAPUS LAPTOP
 elif menu == "❌ Hapus Laptop":
     st.title("❌ Hapus Laptop dari Inventaris")
     if len(df) == 0: st.warning("Belum ada data.")
@@ -265,62 +311,9 @@ elif menu == "❌ Hapus Laptop":
                 st.success("Data berhasil dihapus dari Cloud!")
                 st.rerun()
 
-# 5. FITUR PREMIUM: SURAT BAST (BERITA ACARA SERAH TERIMA) OTOMATIS
+# 6. MENU SURAT BAST
 elif menu == "📝 Cetak Surat BAST":
     st.title("📝 Dokumen Berita Acara Serah Terima (BAST)")
-    st.write("Generate template surat serah terima aset IT Umara Group secara otomatis.")
-    
     if len(df) == 0: st.warning("Data laptop kosong.")
     else:
-        pilih_sn = st.selectbox("Pilih Serial Number Laptop untuk BAST:", df['Serial Number'].tolist())
-        laptop_info = df[df['Serial Number'] == pilih_sn].iloc[0]
-        
-        st.markdown("### 📄 Draft Surat Serah Terima Aset")
-        
-        # Susunan Teks Surat BAST Resmi
-        bast_text = f"""
-        ========================================================================
-                          BERITA ACARA SERAH TERIMA ASET IT
-                                  UMARA GROUP
-        ========================================================================
-        Pada hari ini, {datetime.now().strftime('%A, %d %B %Y')}, kami yang bertandatangan di bawah ini:
-        
-        Pihak I (Yang Menyerahkan): IT Support Specialist Umara Group
-        Pihak II (Yang Menerima)  : {laptop_info.get('User', '...................')} 
-        Divisi/BU                 : {laptop_info.get('Bu User', '...................')}
-        
-        Pihak I menyerahkan fasilitas kantor berupa aset laptop kepada Pihak II, dengan rincian berikut:
-        - Merk / Model Laptop   : {laptop_info.get('Model', '-')}
-        - Nomor Serial (SN)     : {laptop_info.get('Serial Number', '-')}
-        - Status Aset Saat Ini  : {laptop_info.get('Status', '-')}
-        - Catatan Tambahan      : {laptop_info.get('Notes', '-')}
-        
-        Syarat & Ketentuan Penggunaan:
-        1. Pihak II wajib menjaga, merawat, dan bertanggungjawab penuh atas aset tersebut.
-        2. Jika terjadi kerusakan akibat kelalaian pribadi, Pihak II wajib melapor ke divisi IT.
-        3. Aset harus dikembalikan ke IT apabila karyawan yang bersangkutan mengundurkan diri.
-        
-        Demikian Berita Acara ini dibuat dengan sebenar-benarnya untuk digunakan sebagaimana mestinya.
-        
-        Jakarta, {datetime.now().strftime('%d %B %Y')}
-        
-           Yang Menyerahkan,                          Yang Menerima,
-        
-        
-        ( ____________________ )                  ( ____________________ )
-               Pihak I                                    Pihak II
-        """
-        
-        st.text_area("Pratinjau Surat BAST (Bisa di-copy langsung)", value=bast_text, height=450)
-        st.download_button(label="🖨️ Download Surat BAST (.txt)", data=bast_text, file_name=f"BAST_{laptop_info.get('User','User')}.txt")
-
-# 6. FITUR PREMIUM: AUDIT LOG RIWAYAT PERUBAHAN
-elif menu == "📋 Audit Log Perubahan":
-    st.title("📋 Audit Log Riwayat Aktivitas Dashboard")
-    st.write("Memantau setiap riwayat aksi tambah, edit, dan hapus yang dilakukan pada dashboard IT Asset.")
-    
-    if not st.session_state.audit_log:
-        st.info("Belum ada riwayat aktivitas pada sesi ini. Log akan tercatat otomatis saat kamu mengubah data.")
-    else:
-        for log in st.session_state.audit_log:
-            st.write(log)
+        pilih_sn = st.selectbox("Pilih Serial Number Laptop untuk BAST:", df
