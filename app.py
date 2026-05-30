@@ -7,7 +7,11 @@ st.set_page_config(page_title="Dashboard IT Asset Umara Group", layout="wide")
 def load_data():
     try:
         df = pd.read_csv("laporan_laptop_terbaru.csv", sep=";").fillna("")
+        # Bersihkan spasi tak terlihat di nama kolom
         df.columns = df.columns.str.strip()
+        # Paksa semua nama kolom berformat Title Case (huruf besar di awal, misal: 'notes' jadi 'Notes')
+        df.columns = df.columns.str.title()
+        
         if 'Status' in df.columns:
             df['Status'] = df['Status'].str.strip()
         return df
@@ -54,14 +58,14 @@ if menu == "📊 Dashboard & Analytics":
     
     st.markdown("---")
     
-    # SEKSI TABEL DATA (YANG SUDAH AUTO-STRETCH)
+    # SEKSI TABEL DATA
     st.subheader("🔍 Cari & Detail Data Laptop")
     search = st.text_input("Masukkan Model, Serial Number, atau Nama User:")
     
     # Filter data jika ada pencarian
     display_df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df
     
-    # KONFIGURASI KOLOM: Memaksa kolom Notes dan kolom lain melebar otomatis sesuai isi teksnya
+    # Menampilkan dataframe dengan konfigurasi kolom yang aman
     st.dataframe(
         display_df, 
         use_container_width=True,
@@ -150,4 +154,29 @@ elif menu == "✏️ Edit / Update Data":
             if save_changes:
                 st.session_state.df.at[idx, 'Model'] = edit_model
                 st.session_state.df.at[idx, 'Bu Owner'] = edit_bu_owner
-                st.session_state.df.
+                st.session_state.df.at[idx, 'Bu User'] = edit_bu_user
+                st.session_state.df.at[idx, 'Job Title'] = edit_job_title
+                st.session_state.df.at[idx, 'User'] = edit_user
+                st.session_state.df.at[idx, 'Status'] = edit_status
+                st.session_state.df.at[idx, 'Notes'] = edit_notes
+                
+                st.success(f"Data Laptop dengan SN {selected_sn} berhasil di-update!")
+                st.rerun()
+
+# 4. MENU HAPUS LAPTOP
+elif menu == "❌ Hapus Laptop":
+    st.title("❌ Hapus Laptop dari Inventaris")
+    if len(df) == 0:
+        st.warning("Belum ada data laptop yang bisa dihapus.")
+    else:
+        list_sn_hapus = df['Serial Number'].tolist()
+        selected_sn_hapus = st.selectbox("Pilih Serial Number yang Mau Dihapus:", list_sn_hapus)
+        
+        idx_hapus = df[df['Serial Number'] == selected_sn_hapus].index[0]
+        st.warning(f"Apakah kamu yakin ingin menghapus laptop Model {df.loc[idx_hapus, 'Model']} dengan SN {selected_sn_hapus}?")
+        
+        tombol_hapus = st.button("Ya, Hapus Permanen")
+        if tombol_hapus:
+            st.session_state.df = df.drop(idx_hapus).reset_index(drop=True)
+            st.success("Data laptop berhasil dihapus dari sistem!")
+            st.rerun()
