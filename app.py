@@ -10,60 +10,102 @@ st.set_page_config(page_title="Dashboard IT Asset Umara Group", layout="wide")
 GITHUB_REPO = "imam1199/Dashboard-laptop-Office"  
 FILE_PATH = "laporan_laptop_terbaru.csv"
 
-# --- FUNGSI LOAD DATA ---
+try:
+    GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+except:
+    GITHUB_TOKEN = None
+
 def load_data():
     try:
         df = pd.read_csv(FILE_PATH, sep=";").fillna("")
         df.columns = df.columns.str.strip().str.title()
         return df
     except:
-        return pd.DataFrame(columns=["Status", "Model", "Serial Number"])
+        return pd.DataFrame(columns=["Model", "Serial Number", "Bu Owner", "Bu User", "Job Title", "User", "Status", "Notes", "Tahun Beli"])
+
+def save_to_github(dataframe):
+    if not GITHUB_TOKEN: return False
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    res = requests.get(url, headers=headers)
+    sha = res.json().get("sha", "") if res.status_code == 200 else ""
+    csv_content = dataframe.to_csv(index=False, sep=";")
+    encoded_content = base64.b64encode(csv_content.encode("utf-8")).decode("utf-8")
+    payload = {"message": "Update Data", "content": encoded_content, "sha": sha if sha else None}
+    return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
 
 if 'df' not in st.session_state: st.session_state.df = load_data()
+if 'audit_log' not in st.session_state: st.session_state.audit_log = []
 df = st.session_state.df
 
-# --- MENU ---
+def add_log(action, detail):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.session_state.audit_log.insert(0, f"⏱️ [{ts}] - {action}: {detail}")
+
 st.sidebar.title("💻 IT Asset Umara Group")
-menu = st.sidebar.radio("Pilih Menu:", ["📊 Dashboard & Analytics", "👥 User Directory", "➕ Tambah Laptop"])
+menu = st.sidebar.radio("Pilih Menu:", [
+    "📊 Dashboard & Analytics", "👥 User Directory", "➕ Tambah Laptop", 
+    "✏️ Edit Data", "❌ Hapus Laptop", "📝 Cetak BAST", "📋 Audit Log"
+])
 
 if menu == "📊 Dashboard & Analytics":
     st.title("📊 Dashboard IT Asset Umara Group")
-    
-    # 1. Metrik
+    status_counts = df['Status'].value_counts()
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("📦 Total", len(df))
-    c2.metric("🟢 Tersedia", len(df[df['Status'] == 'Tersedia']))
-    c3.metric("🔵 Di Pakai", len(df[df['Status'] == 'Di Pakai']))
-    c4.metric("🟡 Perbaikan", len(df[df['Status'] == 'Perlu Perbaikan']))
-    c5.metric("🔴 Rusak", len(df[df['Status'] == 'Rusak']))
-
-    # 2. Tabel
+    c2.metric("🟢 Tersedia", status_counts.get('Tersedia', 0))
+    c3.metric("🔵 Di Pakai", status_counts.get('Di Pakai', 0))
+    c4.metric("🟡 Perbaikan", status_counts.get('Perlu Perbaikan', 0))
+    c5.metric("🔴 Rusak", status_counts.get('Rusak', 0))
     st.dataframe(df, use_container_width=True)
-
-    # 3. CHART (WAJIB MUNCUL DI BAWAH)
+    
     st.markdown("---")
-    st.subheader("📈 Analisis Data Visual")
-    
-    col_a, col_b = st.columns(2)
-    
-    with col_a:
-        st.write("##### Distribusi Status Laptop")
-        status_data = df['Status'].value_counts().reset_index()
-        status_data.columns = ['Status', 'Jumlah']
-        fig_pie = px.pie(status_data, values='Jumlah', names='Status', hole=0.3)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("🔹 Distribusi Status")
+        fig_pie = px.pie(status_counts.reset_index(), values='count', names='Status', hole=0.4)
         st.plotly_chart(fig_pie, use_container_width=True)
-        
-    with col_b:
-        st.write("##### Top 5 Model Laptop")
-        model_data = df['Model'].value_counts().head(5).reset_index()
-        model_data.columns = ['Model', 'Jumlah']
-        fig_bar = px.bar(model_data, x='Model', y='Jumlah', color='Model')
+    with col2:
+        st.subheader("🔹 Top 5 Model Laptop")
+        top_model = df['Model'].value_counts().head(5).reset_index()
+        fig_bar = px.bar(top_model, x='Model', y='count', color='Model')
         st.plotly_chart(fig_bar, use_container_width=True)
 
 elif menu == "👥 User Directory":
     st.title("👥 User Directory")
-    st.write("Data user...")
+    users = sorted([u for u in df['User'].unique() if str(u).strip()])
+    s_user = st.selectbox("Pilih User:", users)
+    st.dataframe(df[df['User'] == s_user], use_container_width=True)
 
 elif menu == "➕ Tambah Laptop":
     st.title("➕ Tambah Laptop")
-    st.write("Form tambah...")
+    with st.form("add"):
+        m = st.text_input("Model"); sn = st.text_input("SN"); stt = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"])
+        if st.form_submit_button("Simpan"):
+            nr = {"Model": m, "Serial Number": sn, "Status": stt}
+            up_df = pd.concat([df, pd.DataFrame([nr])], ignore_index=True)
+            if save_to_github(up_df): 
+                st.session_state.df = up_df
+                st.success("Tersimpan!")
+                st.rerun()
+
+elif menu == "✏️ Edit Data":
+    st.title("✏️ Edit Data")
+    s_sn = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
+    st.write("Gunakan fitur edit yang sudah ada di sistem sebelumnya.")
+
+elif menu == "❌ Hapus Laptop":
+    st.title("❌ Hapus Laptop")
+    s_del = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
+    if st.button("Hapus Permanen"):
+        up_df = df.drop(df[df['Serial Number'] == s_del].index[0]).reset_index(drop=True)
+        if save_to_github(up_df): st.session_state.df = up_df; st.rerun()
+
+elif menu == "📝 Cetak BAST":
+    st.title("📝 Cetak BAST")
+    p_sn = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
+    st.text_area("Pratinjau BAST", f"BAST untuk SN: {p_sn}")
+
+elif menu == "📋 Audit Log":
+    st.title("📋 Audit Log")
+    for log in st.session_state.audit_log: st.write(log)
