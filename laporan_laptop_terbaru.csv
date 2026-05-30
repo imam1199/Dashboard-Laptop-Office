@@ -1,7 +1,7 @@
-Model ;Serial Number;Buy date;Handover Date;Return Date;Bu Owner;Bu User;Job Title;User;Status;Notes
-Lenovo Yoga 730;MP1GQK7J;;09-Jan-24;;UNB;UNB;Finance Supervisor;Farhan Bachtiar;Di Pakai;
-Lenovo Yoga 730;MP1GNB67;;14-Jan-25;;UNB;UCR;Deputy Managing Director;Ira Arifin;Di Pakai;Ganti keyboard tanggal 29/11/2024
-Lenovo Yoga 730;MP1GQK6P;;-;10-Jan-23;UNB;UNB;LEGAL;Agnes Novita Wijayanti;Di Pakai;
+Model;Serial Number;Buy date;Handover Date;Return Date;Bu Owner;Bu User;Job Title;User;Status;Notes
+LenovoYoga730;MP1GQK7J;;09-Jan-24;;UNB;UNB;Finance Supervisor;Farhan Bachtiar;Di Pakai;
+LenovoYoga730;MP1GNB67;;14-Jan-25;;UNB;UCR;Deputy Managing Director;Ira Arifin;Di Pakai;Ganti keyboard tanggal 29/11/2024
+LenovoYoga730;MP1GQK6P;;-;10-Jan-23;UNB;UNB;LEGAL;Agnes Novita Wijayanti;Di Pakai;
 Lenovo Yoga 730;MP1GNDD9;;26-Apr-19;26-Jul-23;UNB;LBI;MD LBI;Yuni Priyanti;Di Pakai;
 Lenovo Yoga 730;MP1GNHDJ;;;;UNB;UCR;MD UCR;Akhmad Yusuf;Di Pakai;
 Lenovo Thinkpad E490;PF1P8NDR;;15-Jan-24;;UNB;UCR;GM Sales;Thea Harun;Di Pakai;
