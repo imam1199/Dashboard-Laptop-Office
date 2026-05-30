@@ -1,14 +1,14 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Laptop Management", layout="wide")
+# 1. MENGGANTI NAMA DI TAB BROWSER
+st.set_page_config(page_title="Dashboard IT Asset Umara Group", layout="wide")
 
 # Fungsi untuk membaca data awal dari GitHub CSV
 def load_data():
     try:
         df = pd.read_csv("laporan_laptop_terbaru.csv", sep=";").fillna("")
         df.columns = df.columns.str.strip()
-        # Bersihkan spasi di isi kolom Status agar pembacaan akurat
         if 'Status' in df.columns:
             df['Status'] = df['Status'].str.strip()
         return df
@@ -22,23 +22,22 @@ if 'df' not in st.session_state:
 df = st.session_state.df
 
 # Menu Navigasi di Sidebar
-st.sidebar.title("💻 Laptop Management")
+st.sidebar.title("💻 IT Asset Management")
 menu = st.sidebar.radio("Pilih Menu:", ["📊 Dashboard & Analytics", "➕ Tambah Laptop", "✏️ Edit / Update Data", "❌ Hapus Laptop"])
 
 # 1. MENU DASHBOARD & ANALYTICS
 if menu == "📊 Dashboard & Analytics":
-    st.title("📊 Office Laptop Dashboard & Analytics")
-    st.write("Kelola, pantau, dan analisis grafik inventaris laptop kantor secara real-time.")
+    # 2. MENGGANTI JUDUL UTAMA DI HALAMAN DEPAN
+    st.title("📊 Dashboard IT Asset Umara Group")
+    st.write("Kelola, pantau, dan analisis grafik inventaris laptop Umara Group secara real-time.")
     
     st.markdown("### 📈 Ringkasan Status Laptop")
     
     # Menghitung jumlah berdasarkan status secara dinamis
     total_laptop = len(df)
     
-    # Hitung masing-masing status dengan aman (case-insensitive & handle spasi)
     status_counts = df['Status'].value_counts() if 'Status' in df.columns else pd.Series()
     
-    # Fungsi pembantu untuk mengambil total per status
     def get_count(status_name):
         return sum([val for idx, val in status_counts.items() if status_name.lower() in idx.lower()])
 
@@ -57,7 +56,7 @@ if menu == "📊 Dashboard & Analytics":
     
     st.markdown("---")
     
-    # SEKSI TABEL DATA (SEKARANG NAIK KE ATAS)
+    # SEKSI TABEL DATA
     st.subheader("🔍 Cari & Detail Data Laptop")
     search = st.text_input("Masukkan Model, Serial Number, atau Nama User:")
     
@@ -69,16 +68,14 @@ if menu == "📊 Dashboard & Analytics":
         
     st.markdown("---")
     
-    # SEKSI CHART VISUALISASI (SEKARANG TURUN KE BAWAH TABEL)
+    # SEKSI CHART VISUALISASI DI BAWAH
     st.subheader("📊 Grafik Distribusi Status Laptop")
     
-    # Menyiapkan data untuk chart
     chart_data = pd.DataFrame({
         'Status': ['Tersedia', 'Di Pakai', 'Perlu Perbaikan', 'Rusak'],
         'Jumlah Laptop': [tersedia, dipakai, perbaikan, rusak]
     })
     
-    # Menampilkan Bar Chart bawaan Streamlit yang interaktif
     st.bar_chart(data=chart_data, x='Status', y='Jumlah Laptop', use_container_width=True)
 
 # 2. MENU TAMBAH LAPTOP
@@ -152,24 +149,3 @@ elif menu == "✏️ Edit / Update Data":
                 st.session_state.df.at[idx, 'User'] = edit_user
                 st.session_state.df.at[idx, 'Status'] = edit_status
                 st.session_state.df.at[idx, 'Notes'] = edit_notes
-                
-                st.success(f"Data Laptop dengan SN {selected_sn} berhasil di-update!")
-                st.rerun()
-
-# 4. MENU HAPUS LAPTOP
-elif menu == "❌ Hapus Laptop":
-    st.title("❌ Hapus Laptop dari Inventaris")
-    if len(df) == 0:
-        st.warning("Belum ada data laptop yang bisa dihapus.")
-    else:
-        list_sn_hapus = df['Serial Number'].tolist()
-        selected_sn_hapus = st.selectbox("Pilih Serial Number yang Mau Dihapus:", list_sn_hapus)
-        
-        idx_hapus = df[df['Serial Number'] == selected_sn_hapus].index[0]
-        st.warning(f"Apakah kamu yakin ingin menghapus laptop Model {df.loc[idx_hapus, 'Model']} dengan SN {selected_sn_hapus}?")
-        
-        tombol_hapus = st.button("Ya, Hapus Permanen")
-        if tombol_hapus:
-            st.session_state.df = df.drop(idx_hapus).reset_index(drop=True)
-            st.success("Data laptop berhasil dihapus dari sistem!")
-            st.rerun()
