@@ -7,13 +7,13 @@ st.set_page_config(page_title="Dashboard IT Asset Umara Group", layout="wide")
 def load_data():
     try:
         df = pd.read_csv("laporan_laptop_terbaru.csv", sep=";").fillna("")
-        # Bersihkan spasi tak terlihat di nama kolom
         df.columns = df.columns.str.strip()
-        # Paksa semua nama kolom berformat Title Case (huruf besar di awal, misal: 'notes' jadi 'Notes')
         df.columns = df.columns.str.title()
         
         if 'Status' in df.columns:
             df['Status'] = df['Status'].str.strip()
+        if 'Model' in df.columns:
+            df['Model'] = df['Model'].str.strip()
         return df
     except:
         return pd.DataFrame(columns=["Model", "Serial Number", "Bu Owner", "Bu User", "Job Title", "User", "Status", "Notes"])
@@ -37,7 +37,6 @@ if menu == "📊 Dashboard & Analytics":
     
     # Menghitung jumlah berdasarkan status secara dinamis
     total_laptop = len(df)
-    
     status_counts = df['Status'].value_counts() if 'Status' in df.columns else pd.Series()
     
     def get_count(status_name):
@@ -62,10 +61,8 @@ if menu == "📊 Dashboard & Analytics":
     st.subheader("🔍 Cari & Detail Data Laptop")
     search = st.text_input("Masukkan Model, Serial Number, atau Nama User:")
     
-    # Filter data jika ada pencarian
     display_df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df
     
-    # Menampilkan dataframe dengan konfigurasi kolom yang aman
     st.dataframe(
         display_df, 
         use_container_width=True,
@@ -78,15 +75,30 @@ if menu == "📊 Dashboard & Analytics":
         
     st.markdown("---")
     
-    # SEKSI CHART VISUALISASI DI BAWAH
-    st.subheader("📊 Grafik Distribusi Status Laptop")
+    # SEKSI DUA CHART BERDAMPINGAN (KIRI & KANAN)
+    st.subheader("📊 Analytics Visualisasi Aset")
     
-    chart_data = pd.DataFrame({
-        'Status': ['Tersedia', 'Di Pakai', 'Perlu Perbaikan', 'Rusak'],
-        'Jumlah Laptop': [tersedia, dipakai, perbaikan, rusak]
-    })
+    chart_col1, chart_col2 = st.columns(2)
     
-    st.bar_chart(data=chart_data, x='Status', y='Jumlah Laptop', use_container_width=True)
+    # KANVAS KIRI: CHART STATUS
+    with chart_col1:
+        st.markdown("##### 🔹 Distribusi Berdasarkan Status")
+        status_chart_data = pd.DataFrame({
+            'Status': ['Tersedia', 'Di Pakai', 'Perlu Perbaikan', 'Rusak'],
+            'Jumlah': [tersedia, dipakai, perbaikan, rusak]
+        })
+        st.bar_chart(data=status_chart_data, x='Status', y='Jumlah', use_container_width=True)
+        
+    # KANVAS KANAN: CHART MODEL LAPTOP (FITUR BARU)
+    with chart_col2:
+        st.markdown("##### 🔹 Top 5 Model Laptop Terbanyak")
+        if 'Model' in df.columns and len(df) > 0:
+            # Ambil 5 model laptop terbanyak di kantor
+            model_counts = df['Model'].value_counts().head(5).reset_index()
+            model_counts.columns = ['Model Laptop', 'Jumlah']
+            st.bar_chart(data=model_counts, x='Model Laptop', y='Jumlah', use_container_width=True)
+        else:
+            st.info("Belum ada data model laptop untuk dibuat grafik.")
 
 # 2. MENU TAMBAH LAPTOP
 elif menu == "➕ Tambah Laptop":
@@ -154,29 +166,3 @@ elif menu == "✏️ Edit / Update Data":
             if save_changes:
                 st.session_state.df.at[idx, 'Model'] = edit_model
                 st.session_state.df.at[idx, 'Bu Owner'] = edit_bu_owner
-                st.session_state.df.at[idx, 'Bu User'] = edit_bu_user
-                st.session_state.df.at[idx, 'Job Title'] = edit_job_title
-                st.session_state.df.at[idx, 'User'] = edit_user
-                st.session_state.df.at[idx, 'Status'] = edit_status
-                st.session_state.df.at[idx, 'Notes'] = edit_notes
-                
-                st.success(f"Data Laptop dengan SN {selected_sn} berhasil di-update!")
-                st.rerun()
-
-# 4. MENU HAPUS LAPTOP
-elif menu == "❌ Hapus Laptop":
-    st.title("❌ Hapus Laptop dari Inventaris")
-    if len(df) == 0:
-        st.warning("Belum ada data laptop yang bisa dihapus.")
-    else:
-        list_sn_hapus = df['Serial Number'].tolist()
-        selected_sn_hapus = st.selectbox("Pilih Serial Number yang Mau Dihapus:", list_sn_hapus)
-        
-        idx_hapus = df[df['Serial Number'] == selected_sn_hapus].index[0]
-        st.warning(f"Apakah kamu yakin ingin menghapus laptop Model {df.loc[idx_hapus, 'Model']} dengan SN {selected_sn_hapus}?")
-        
-        tombol_hapus = st.button("Ya, Hapus Permanen")
-        if tombol_hapus:
-            st.session_state.df = df.drop(idx_hapus).reset_index(drop=True)
-            st.success("Data laptop berhasil dihapus dari sistem!")
-            st.rerun()
