@@ -15,17 +15,18 @@ try:
 except:
     GITHUB_TOKEN = None
 
-# Fungsi untuk membaca data awal dengan pembersihan total
+# Fungsi untuk membaca data awal dengan pembersihan total (Anti-Spasi Gaib)
 def load_data():
     try:
         df = pd.read_csv(FILE_PATH, sep=";").fillna("")
         
-        # Bersihkan spasi gaib di nama kolom
+        # 1. Bersihkan spasi gaib di depan/belakang nama semua kolom (Sikat abis eror KeyError!)
         df.columns = df.columns.str.strip()
-        # Paksa semua nama kolom berformat Title Case
+        
+        # 2. Paksa semua nama kolom berformat Title Case (Huruf besar di awal)
         df.columns = df.columns.str.title()
         
-        # Bersihkan spasi di isi data kolom penting
+        # 3. Bersihkan spasi di isi data kolom penting
         if 'Status' in df.columns:
             df['Status'] = df['Status'].astype(str).str.strip()
         if 'Model' in df.columns:
@@ -115,16 +116,16 @@ if menu == "📊 Dashboard & Analytics":
     # Filter data berdasarkan pencarian
     display_df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df
     
-    # FITUR BARU: Membuat nomor urut otomatis (1, 2, 3...) di sebelah kiri kolom Model
+    # Membuat nomor urut otomatis (1, 2, 3...) di sebelah kiri kolom Model
     if len(display_df) > 0:
-        # Duplikat dataframe biar gak merusak data asli
         numbered_df = display_df.copy()
-        # Sisipkan kolom "No" di urutan paling pertama (indeks 0)
+        # Bersihkan spasi nama kolom pada data display agar sinkron dengan config tabel
+        numbered_df.columns = numbered_df.columns.str.strip()
         numbered_df.insert(0, "No", range(1, len(numbered_df) + 1))
     else:
         numbered_df = display_df
 
-    # Tampilkan dataframe yang sudah diberi nomor urut
+    # Tampilkan dataframe yang sudah diberi nomor urut dan dipastikan bersih nama kolomnya
     st.dataframe(
         numbered_df, 
         use_container_width=True,
@@ -216,4 +217,50 @@ elif menu == "✏️ Edit / Update Data":
         with st.form("form_edit"):
             edit_model = st.text_input("Model Laptop", value=data_laptop.get('Model', ''))
             edit_bu_owner = st.text_input("BU Owner", value=data_laptop.get('Bu Owner', ''))
-            edit_bu_user = st.text_input("
+            edit_bu_user = st.text_input("BU User", value=data_laptop.get('Bu User', ''))
+            edit_job_title = st.text_input("Job Title", value=data_laptop.get('Job Title', ''))
+            edit_user = st.text_input("Nama User", value=data_laptop.get('User', ''))
+            
+            current_status = data_laptop.get('Status', 'Tersedia')
+            status_options = ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"]
+            default_status_idx = status_options.index(current_status) if current_status in status_options else 0
+            edit_status = st.selectbox("Status", status_options, index=default_status_idx)
+            
+            edit_notes = st.text_area("Notes / Catatan", value=data_laptop.get('Notes', ''))
+            
+            save_changes = st.form_submit_button("Simpan Perubahan Data")
+            if save_changes:
+                updated_df = df.copy()
+                updated_df.at[idx, 'Model'] = edit_model.strip()
+                updated_df.at[idx, 'Bu Owner'] = edit_bu_owner
+                updated_df.at[idx, 'Bu User'] = edit_bu_user
+                updated_df.at[idx, 'Job Title'] = edit_job_title
+                updated_df.at[idx, 'User'] = edit_user
+                updated_df.at[idx, 'Status'] = edit_status
+                updated_df.at[idx, 'Notes'] = edit_notes
+                
+                with st.spinner("Memperbarui data di cloud GitHub..."):
+                    if save_to_github(updated_df):
+                        st.session_state.df = updated_df
+                        st.success(f"Perubahan data SN {selected_sn} berhasil disimpan permanen ke GitHub cloud!")
+                        st.rerun()
+
+# 4. MENU HAPUS LAPTOP
+elif menu == "❌ Hapus Laptop":
+    st.title("❌ Hapus Laptop dari Inventaris")
+    if len(df) == 0:
+        st.warning("Belum ada data laptop yang bisa dihapus.")
+    else:
+        list_sn_hapus = df['Serial Number'].tolist()
+        selected_sn_hapus = st.selectbox("Pilih Serial Number yang Mau Dihapus:", list_sn_hapus)
+        idx_hapus = df[df['Serial Number'] == selected_sn_hapus].index[0]
+        st.warning(f"Apakah kamu yakin menghapus laptop Model {df.loc[idx_hapus, 'Model']} dengan SN {selected_sn_hapus}?")
+        
+        tombol_hapus = st.button("Ya, Hapus Permanen")
+        if tombol_hapus:
+            updated_df = df.drop(idx_hapus).reset_index(drop=True)
+            with st.spinner("Menghapus data dari cloud GitHub..."):
+                if save_to_github(updated_df):
+                    st.session_state.df = updated_df
+                    st.success("Data berhasil dihapus permanen dari cloud GitHub!")
+                    st.rerun()
