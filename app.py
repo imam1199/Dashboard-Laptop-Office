@@ -113,21 +113,4 @@ elif menu == "✏️ Edit Data":
             up_df.at[idx, 'Model'] = em; up_df.at[idx, 'Bu Owner'] = ebo; up_df.at[idx, 'Bu User'] = ebu
             up_df.at[idx, 'Job Title'] = ejt; up_df.at[idx, 'User'] = eus; up_df.at[idx, 'Status'] = est
             up_df.at[idx, 'Tahun Beli'] = etb; up_df.at[idx, 'Notes'] = ent
-            if save_to_github(up_df): st.session_state.df = up_df; add_log("EDIT", s_sn); st.success("Terupdate!"); st.rerun()
-
-elif menu == "❌ Hapus Laptop":
-    st.title("❌ Hapus Laptop")
-    s_del = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
-    if st.button("Ya, Hapus Permanen"):
-        up_df = df.drop(df[df['Serial Number'] == s_del].index[0]).reset_index(drop=True)
-        if save_to_github(up_df): st.session_state.df = up_df; add_log("HAPUS", s_del); st.rerun()
-
-elif menu == "📝 Cetak BAST":
-    st.title("📝 Dokumen BAST")
-    p_sn = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
-    li = df[df['Serial Number'] == p_sn].iloc[0]
-    st.text_area("Pratinjau BAST", f"BAST untuk {li.get('User')}\nModel: {li.get('Model')}\nSN: {li.get('Serial Number')}", height=300)
-
-elif menu == "📋 Audit Log":
-    st.title("📋 Audit Log")
-    for log in st.session_state.audit_log: st.write(log)
+            if save_to_github(
