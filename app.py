@@ -25,7 +25,7 @@ df = st.session_state.df
 st.sidebar.title("💻 Laptop Management")
 menu = st.sidebar.radio("Pilih Menu:", ["📊 Dashboard & Analytics", "➕ Tambah Laptop", "✏️ Edit / Update Data", "❌ Hapus Laptop"])
 
-# 1. MENU DASHBOARD & ANALYTICS (DENGAN CHART KEREN)
+# 1. MENU DASHBOARD & ANALYTICS
 if menu == "📊 Dashboard & Analytics":
     st.title("📊 Office Laptop Dashboard & Analytics")
     st.write("Kelola, pantau, dan analisis grafik inventaris laptop kantor secara real-time.")
@@ -57,7 +57,19 @@ if menu == "📊 Dashboard & Analytics":
     
     st.markdown("---")
     
-    # SEKSI CHART VISUALISASI
+    # SEKSI TABEL DATA (SEKARANG NAIK KE ATAS)
+    st.subheader("🔍 Cari & Detail Data Laptop")
+    search = st.text_input("Masukkan Model, Serial Number, atau Nama User:")
+    
+    if search:
+        mask = df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)
+        st.dataframe(df[mask], use_container_width=True)
+    else:
+        st.dataframe(df, use_container_width=True)
+        
+    st.markdown("---")
+    
+    # SEKSI CHART VISUALISASI (SEKARANG TURUN KE BAWAH TABEL)
     st.subheader("📊 Grafik Distribusi Status Laptop")
     
     # Menyiapkan data untuk chart
@@ -68,16 +80,6 @@ if menu == "📊 Dashboard & Analytics":
     
     # Menampilkan Bar Chart bawaan Streamlit yang interaktif
     st.bar_chart(data=chart_data, x='Status', y='Jumlah Laptop', use_container_width=True)
-    
-    st.markdown("---")
-    st.subheader("🔍 Cari Data Laptop")
-    search = st.text_input("Masukkan Model, Serial Number, atau Nama User:")
-    
-    if search:
-        mask = df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)
-        st.dataframe(df[mask], use_container_width=True)
-    else:
-        st.dataframe(df, use_container_width=True)
 
 # 2. MENU TAMBAH LAPTOP
 elif menu == "➕ Tambah Laptop":
