@@ -5,7 +5,7 @@ import os
 # Konfigurasi Halaman
 st.set_page_config(page_title="Office Laptop Dashboard", layout="wide")
 
-CSV_FILE = "laporan_laptop_terbaru.csv"
+CSV_FILE = "laporan_laptop_terbaru(1).csv"
 
 # Fungsi untuk memuat data
 def load_data():
