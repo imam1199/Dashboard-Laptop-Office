@@ -115,21 +115,30 @@ if menu == "📊 Dashboard & Analytics":
     # Filter data berdasarkan pencarian
     display_df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df
     
-    # Tampilkan dataframe
+    # FITUR BARU: Membuat nomor urut otomatis (1, 2, 3...) di sebelah kiri kolom Model
+    if len(display_df) > 0:
+        # Duplikat dataframe biar gak merusak data asli
+        numbered_df = display_df.copy()
+        # Sisipkan kolom "No" di urutan paling pertama (indeks 0)
+        numbered_df.insert(0, "No", range(1, len(numbered_df) + 1))
+    else:
+        numbered_df = display_df
+
+    # Tampilkan dataframe yang sudah diberi nomor urut
     st.dataframe(
-        display_df, 
+        numbered_df, 
         use_container_width=True,
+        hide_index=True,  # Menyembunyikan indeks bawaan angka 0 Streamlit
         column_config={
+            "No": st.column_config.NumberColumn("No", width="small"),
             "Notes": st.column_config.TextColumn("Notes", width="large"),
             "Model": st.column_config.TextColumn("Model", width="medium"),
             "Serial Number": st.column_config.TextColumn("Serial Number", width="medium")
         }
     )
     
-    # FITUR BARU: Tombol Download CSV Hasil Filter / Seluruh Data
-    # Konversi data ke CSV (pake titik koma ';' biar langsung rapi pas dibuka di Excel laptop Indonesia)
+    # Tombol Download CSV
     csv_to_download = display_df.to_csv(index=False, sep=";").encode('utf-8')
-    
     st.download_button(
         label="📥 Download Data CSV (Excel Format)",
         data=csv_to_download,
@@ -207,50 +216,4 @@ elif menu == "✏️ Edit / Update Data":
         with st.form("form_edit"):
             edit_model = st.text_input("Model Laptop", value=data_laptop.get('Model', ''))
             edit_bu_owner = st.text_input("BU Owner", value=data_laptop.get('Bu Owner', ''))
-            edit_bu_user = st.text_input("BU User", value=data_laptop.get('Bu User', ''))
-            edit_job_title = st.text_input("Job Title", value=data_laptop.get('Job Title', ''))
-            edit_user = st.text_input("Nama User", value=data_laptop.get('User', ''))
-            
-            current_status = data_laptop.get('Status', 'Tersedia')
-            status_options = ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"]
-            default_status_idx = status_options.index(current_status) if current_status in status_options else 0
-            edit_status = st.selectbox("Status", status_options, index=default_status_idx)
-            
-            edit_notes = st.text_area("Notes / Catatan", value=data_laptop.get('Notes', ''))
-            
-            save_changes = st.form_submit_button("Simpan Perubahan Data")
-            if save_changes:
-                updated_df = df.copy()
-                updated_df.at[idx, 'Model'] = edit_model.strip()
-                updated_df.at[idx, 'Bu Owner'] = edit_bu_owner
-                updated_df.at[idx, 'Bu User'] = edit_bu_user
-                updated_df.at[idx, 'Job Title'] = edit_job_title
-                updated_df.at[idx, 'User'] = edit_user
-                updated_df.at[idx, 'Status'] = edit_status
-                updated_df.at[idx, 'Notes'] = edit_notes
-                
-                with st.spinner("Memperbarui data di cloud GitHub..."):
-                    if save_to_github(updated_df):
-                        st.session_state.df = updated_df
-                        st.success(f"Perubahan data SN {selected_sn} berhasil disimpan permanen ke GitHub cloud!")
-                        st.rerun()
-
-# 4. MENU HAPUS LAPTOP
-elif menu == "❌ Hapus Laptop":
-    st.title("❌ Hapus Laptop dari Inventaris")
-    if len(df) == 0:
-        st.warning("Belum ada data laptop yang bisa dihapus.")
-    else:
-        list_sn_hapus = df['Serial Number'].tolist()
-        selected_sn_hapus = st.selectbox("Pilih Serial Number yang Mau Dihapus:", list_sn_hapus)
-        idx_hapus = df[df['Serial Number'] == selected_sn_hapus].index[0]
-        st.warning(f"Apakah kamu yakin menghapus laptop Model {df.loc[idx_hapus, 'Model']} dengan SN {selected_sn_hapus}?")
-        
-        tombol_hapus = st.button("Ya, Hapus Permanen")
-        if tombol_hapus:
-            updated_df = df.drop(idx_hapus).reset_index(drop=True)
-            with st.spinner("Menghapus data dari cloud GitHub..."):
-                if save_to_github(updated_df):
-                    st.session_state.df = updated_df
-                    st.success("Data berhasil dihapus permanen dari cloud GitHub!")
-                    st.rerun()
+            edit_bu_user = st.text_input("
