@@ -3,38 +3,71 @@ import pandas as pd
 
 st.set_page_config(page_title="Laptop Management", layout="wide")
 
-# Fungsi untuk membaca data dengan pembatas titik koma (;)
+# Fungsi untuk membaca data awal dari GitHub CSV
 def load_data():
-    # Membaca file dan membersihkan spasi tak terlihat di nama kolom
-    df = pd.read_csv("laporan_laptop_terbaru.csv", sep=";").fillna("")
-    df.columns = df.columns.str.strip()
-    return df
+    try:
+        df = pd.read_csv("laporan_laptop_terbaru.csv", sep=";").fillna("")
+        df.columns = df.columns.str.strip()
+        # Bersihkan spasi di isi kolom Status agar pembacaan akurat
+        if 'Status' in df.columns:
+            df['Status'] = df['Status'].str.strip()
+        return df
+    except:
+        return pd.DataFrame(columns=["Model", "Serial Number", "Bu Owner", "Bu User", "Job Title", "User", "Status", "Notes"])
 
-# Inisialisasi data
+# Inisialisasi data ke dalam session state
 if 'df' not in st.session_state:
     st.session_state.df = load_data()
 
 df = st.session_state.df
 
+# Menu Navigasi di Sidebar
 st.sidebar.title("💻 Laptop Management")
-menu = st.sidebar.radio("Pilih Menu:", ["Dashboard & View", "Tambah Laptop"])
+menu = st.sidebar.radio("Pilih Menu:", ["📊 Dashboard & Analytics", "➕ Tambah Laptop", "✏️ Edit / Update Data", "❌ Hapus Laptop"])
 
-if menu == "Dashboard & View":
-    st.title("📊 Office Laptop Dashboard")
-    st.write("Kelola dan pantau inventaris laptop kantor dengan mudah.")
+# 1. MENU DASHBOARD & ANALYTICS (DENGAN CHART KEREN)
+if menu == "📊 Dashboard & Analytics":
+    st.title("📊 Office Laptop Dashboard & Analytics")
+    st.write("Kelola, pantau, dan analisis grafik inventaris laptop kantor secara real-time.")
     
-    # Metrik Dashboard
+    st.markdown("### 📈 Ringkasan Status Laptop")
+    
+    # Menghitung jumlah berdasarkan status secara dinamis
     total_laptop = len(df)
     
-    # Cek kolom status dengan aman
-    if 'Status' in df.columns:
-        dipakai = len(df[df['Status'].str.contains('Pakai', case=False, na=False)])
-    else:
-        dipakai = 0
-        
-    col1, col2 = st.columns(2)
-    col1.metric("Total Laptop", total_laptop)
-    col2.metric("Laptop Di Pakai", dipakai)
+    # Hitung masing-masing status dengan aman (case-insensitive & handle spasi)
+    status_counts = df['Status'].value_counts() if 'Status' in df.columns else pd.Series()
+    
+    # Fungsi pembantu untuk mengambil total per status
+    def get_count(status_name):
+        return sum([val for idx, val in status_counts.items() if status_name.lower() in idx.lower()])
+
+    dipakai = get_count('Pakai')
+    tersedia = get_count('Tersedia')
+    perbaikan = get_count('Perbaikan')
+    rusak = get_count('Rusak')
+    
+    # Menampilkan 5 Kotak Metrik di Atas
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("📦 Total Laptop", total_laptop)
+    col2.metric("🟢 Tersedia", tersedia)
+    col3.metric("🔵 Di Pakai", dipakai)
+    col4.metric("🟡 Perlu Perbaikan", perbaikan)
+    col5.metric("🔴 Rusak", rusak)
+    
+    st.markdown("---")
+    
+    # SEKSI CHART VISUALISASI
+    st.subheader("📊 Grafik Distribusi Status Laptop")
+    
+    # Menyiapkan data untuk chart
+    chart_data = pd.DataFrame({
+        'Status': ['Tersedia', 'Di Pakai', 'Perlu Perbaikan', 'Rusak'],
+        'Jumlah Laptop': [tersedia, dipakai, perbaikan, rusak]
+    })
+    
+    # Menampilkan Bar Chart bawaan Streamlit yang interaktif
+    st.bar_chart(data=chart_data, x='Status', y='Jumlah Laptop', use_container_width=True)
     
     st.markdown("---")
     st.subheader("🔍 Cari Data Laptop")
@@ -46,22 +79,95 @@ if menu == "Dashboard & View":
     else:
         st.dataframe(df, use_container_width=True)
 
-elif menu == "Tambah Laptop":
+# 2. MENU TAMBAH LAPTOP
+elif menu == "➕ Tambah Laptop":
     st.title("➕ Tambah Laptop Baru")
     with st.form("form_tambah"):
         model = st.text_input("Model Laptop")
-        sn = st.text_input("Serial Number")
+        sn = st.text_input("Serial Number (Wajib Unik)")
         bu_owner = st.text_input("BU Owner")
-        status = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan"])
+        bu_user = st.text_input("BU User")
+        job_title = st.text_input("Job Title")
+        user = st.text_input("Nama User")
+        status = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"])
+        notes = st.text_area("Notes / Catatan")
         
-        submit = st.form_submit_button("Simpan Data")
+        submit = st.form_submit_button("Simpan Data Baru")
         if submit:
-            new_row = {col: "" for col in df.columns}
-            new_row['Model'] = model
-            new_row['Serial Number'] = sn
-            new_row['Bu Owner'] = bu_owner
-            new_row['Status'] = status
+            if not sn:
+                st.error("Serial Number tidak boleh kosong!")
+            elif sn in df['Serial Number'].values:
+                st.error("Serial Number sudah terdaftar!")
+            else:
+                new_row = {col: "" for col in df.columns}
+                new_row['Model'] = model
+                new_row['Serial Number'] = sn
+                new_row['Bu Owner'] = bu_owner
+                new_row['Bu User'] = bu_user
+                new_row['Job Title'] = job_title
+                new_row['User'] = user
+                new_row['Status'] = status
+                new_row['Notes'] = notes
+                
+                st.session_state.df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                st.success(f"Laptop {model} berhasil ditambahkan!")
+                st.rerun()
+
+# 3. MENU EDIT / UPDATE DATA
+elif menu == "✏️ Edit / Update Data":
+    st.title("✏️ Edit & Update Data Laptop")
+    
+    if len(df) == 0:
+        st.warning("Belum ada data laptop yang bisa diedit.")
+    else:
+        list_sn = df['Serial Number'].tolist()
+        selected_sn = st.selectbox("Pilih Serial Number Laptop:", list_sn)
+        
+        idx = df[df['Serial Number'] == selected_sn].index[0]
+        data_laptop = df.loc[idx]
+        
+        st.markdown("### Ubah Form di Bawah Ini:")
+        with st.form("form_edit"):
+            edit_model = st.text_input("Model Laptop", value=data_laptop.get('Model', ''))
+            edit_bu_owner = st.text_input("BU Owner", value=data_laptop.get('Bu Owner', ''))
+            edit_bu_user = st.text_input("BU User", value=data_laptop.get('Bu User', ''))
+            edit_job_title = st.text_input("Job Title", value=data_laptop.get('Job Title', ''))
+            edit_user = st.text_input("Nama User", value=data_laptop.get('User', ''))
             
-            new_data = pd.DataFrame([new_row])
-            st.session_state.df = pd.concat([df, new_data], ignore_index=True)
-            st.success("Data berhasil ditambahkan di dashboard!")
+            current_status = data_laptop.get('Status', 'Tersedia')
+            status_options = ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"]
+            default_status_idx = status_options.index(current_status) if current_status in status_options else 0
+            edit_status = st.selectbox("Status", status_options, index=default_status_idx)
+            
+            edit_notes = st.text_area("Notes / Catatan", value=data_laptop.get('Notes', ''))
+            
+            save_changes = st.form_submit_button("Simpan Perubahan Data")
+            if save_changes:
+                st.session_state.df.at[idx, 'Model'] = edit_model
+                st.session_state.df.at[idx, 'Bu Owner'] = edit_bu_owner
+                st.session_state.df.at[idx, 'Bu User'] = edit_bu_user
+                st.session_state.df.at[idx, 'Job Title'] = edit_job_title
+                st.session_state.df.at[idx, 'User'] = edit_user
+                st.session_state.df.at[idx, 'Status'] = edit_status
+                st.session_state.df.at[idx, 'Notes'] = edit_notes
+                
+                st.success(f"Data Laptop dengan SN {selected_sn} berhasil di-update!")
+                st.rerun()
+
+# 4. MENU HAPUS LAPTOP
+elif menu == "❌ Hapus Laptop":
+    st.title("❌ Hapus Laptop dari Inventaris")
+    if len(df) == 0:
+        st.warning("Belum ada data laptop yang bisa dihapus.")
+    else:
+        list_sn_hapus = df['Serial Number'].tolist()
+        selected_sn_hapus = st.selectbox("Pilih Serial Number yang Mau Dihapus:", list_sn_hapus)
+        
+        idx_hapus = df[df['Serial Number'] == selected_sn_hapus].index[0]
+        st.warning(f"Apakah kamu yakin ingin menghapus laptop Model {df.loc[idx_hapus, 'Model']} dengan SN {selected_sn_hapus}?")
+        
+        tombol_hapus = st.button("Ya, Hapus Permanen")
+        if tombol_hapus:
+            st.session_state.df = df.drop(idx_hapus).reset_index(drop=True)
+            st.success("Data laptop berhasil dihapus dari sistem!")
+            st.rerun()
