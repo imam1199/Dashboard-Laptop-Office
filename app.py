@@ -28,7 +28,7 @@ def load_data():
 
 def save_to_github(dataframe):
     if not GITHUB_TOKEN:
-        st.error("GITHUB_TOKEN belum dipasang!")
+        st.error("GITHUB_TOKEN belum dipasang di Secrets!")
         return False
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
@@ -37,13 +37,21 @@ def save_to_github(dataframe):
     csv_content = dataframe.to_csv(index=False, sep=";")
     encoded_content = base64.b64encode(csv_content.encode("utf-8")).decode("utf-8")
     payload = {
-        "message": f"Update Dashboard - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        "message": f"Update via Dashboard - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "content": encoded_content, "sha": sha if sha else None
     }
     return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
 
-if 'df' not in st.session_state: st.session_state.df = load_data()
+if 'df' not in st.session_state:
+    st.session_state.df = load_data()
+if 'audit_log' not in st.session_state:
+    st.session_state.audit_log = []
+
 df = st.session_state.df
+
+def add_log(action, detail):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.session_state.audit_log.insert(0, f"⏱️ [{ts}] - {action}: {detail}")
 
 st.sidebar.title("💻 IT Asset Umara Group")
 menu = st.sidebar.radio("Pilih Menu:", [
@@ -53,36 +61,107 @@ menu = st.sidebar.radio("Pilih Menu:", [
 
 if menu == "📊 Dashboard & Analytics":
     st.title("📊 Dashboard IT Asset Umara Group")
-    status_counts = df['Status'].value_counts()
+    total_laptop = len(df)
+    status_counts = df['Status'].value_counts() if 'Status' in df.columns else pd.Series()
+    def get_count(name): return sum([v for k, v in status_counts.items() if name.lower() in k.lower()])
     
-    # Metrik
+    dipakai, tersedia, perbaikan, rusak = get_count('Pakai'), get_count('Tersedia'), get_count('Perbaikan'), get_count('Rusak')
+    
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("📦 Total", len(df))
-    c2.metric("🟢 Tersedia", status_counts.get('Tersedia', 0))
-    c3.metric("🔵 Di Pakai", status_counts.get('Di Pakai', 0))
-    c4.metric("🟡 Perbaikan", status_counts.get('Perlu Perbaikan', 0))
-    c5.metric("🔴 Rusak", status_counts.get('Rusak', 0))
+    c1.metric("📦 Total", total_laptop)
+    c2.metric("🟢 Tersedia", tersedia)
+    c3.metric("🔵 Di Pakai", dipakai)
+    c4.metric("🟡 Perbaikan", perbaikan)
+    c5.metric("🔴 Rusak", rusak)
     
     st.markdown("---")
-    st.dataframe(df, use_container_width=True)
-    
-    # CHART DI BAWAH
-    st.markdown("---")
-    col_ch1, col_ch2 = st.columns(2)
-    
-    with col_ch1:
-        st.subheader("🔹 Distribusi Status")
-        fig_pie = px.pie(status_counts.reset_index(), values='count', names='Status', hole=0.4)
-        st.plotly_chart(fig_pie, use_container_width=True)
+    f1, f2, f3 = st.columns([1, 1, 2])
+    with f1:
+        bo_opts = ["Semua"] + sorted(list(df['Bu Owner'].unique())) if 'Bu Owner' in df.columns else ["Semua"]
+        s_bo = st.selectbox("Filter BU Owner:", bo_opts)
+    with f2:
+        s_st = st.selectbox("Filter Status:", ["Semua", "Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"])
+    with f3:
+        search = st.text_input("Cari (Model/SN/User):")
         
-    with col_ch2:
-        st.subheader("🔹 Top 5 Model Laptop")
-        top_model = df['Model'].value_counts().head(5).reset_index()
-        fig_bar = px.bar(top_model, x='Model', y='count', color='Model')
-        st.plotly_chart(fig_bar, use_container_width=True)
+    d_df = df.copy()
+    if s_bo != "Semua": d_df = d_df[d_df['Bu Owner'] == s_bo]
+    if s_st != "Semua": d_df = d_df[d_df['Status'].str.contains(s_st, case=False, na=False)]
+    if search: d_df = d_df[d_df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
+    
+    if len(d_df) > 0:
+        n_df = d_df.copy()
+        n_df.insert(0, "No", range(1, len(n_df) + 1))
+    else: n_df = d_df
 
-# ... (Menu lainnya tetap sama)
+    st.dataframe(n_df, use_container_width=True, hide_index=True)
+    st.download_button("📥 Download Excel (CSV)", d_df.to_csv(index=False, sep=";").encode('utf-8'), "laporan.csv", "text/csv")
+
 elif menu == "👥 User Directory":
-    st.title("👥 User Directory")
-    s_user = st.selectbox("Pilih User:", sorted(df['User'].unique()))
-    st.dataframe(df[df['User'] == s_user], use_container_width=True)
+    st.title("👥 User Directory & Histori")
+    if 'User' in df.columns and len(df) > 0:
+        list_users = sorted([u for u in df['User'].unique() if u.strip() != ""])
+        if list_users:
+            s_user = st.selectbox("🎯 Pilih Nama Karyawan:", list_users)
+            u_data = df[df['User'] == s_user]
+            p1, p2, p3 = st.columns(3)
+            p1.info(f"👤 **User:**\n### {s_user}")
+            p2.success(f"💼 **Jabatan:**\n### {u_data.iloc[0].get('Job Title', '-')} ({u_data.iloc[0].get('Bu User', '-')})")
+            p3.warning(f"💻 **Aset Pegang:**\n### {len(u_data)} Unit")
+            st.dataframe(u_data, use_container_width=True)
+    else: st.warning("Data kosong.")
+
+elif menu == "➕ Tambah Laptop":
+    st.title("➕ Tambah Laptop Baru")
+    with st.form("f_add"):
+        m = st.text_input("Model")
+        sn = st.text_input("SN")
+        bo = st.text_input("BU Owner")
+        bu = st.text_input("BU User")
+        jt = st.text_input("Job Title")
+        us = st.text_input("User")
+        stt = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"])
+        tb = st.number_input("Tahun Beli", 2015, 2030, 2026)
+        nt = st.text_area("Notes")
+        if st.form_submit_button("Simpan"):
+            nr = {"Model": m.strip(), "Serial Number": sn.strip(), "Bu Owner": bo.strip(), "Bu User": bu.strip(), "Job Title": jt.strip(), "User": us.strip(), "Status": stt, "Tahun Beli": tb, "Notes": nt}
+            up_df = pd.concat([df, pd.DataFrame([nr])], ignore_index=True)
+            if save_to_github(up_df):
+                st.session_state.df = up_df
+                st.success("Tersimpan!")
+                st.rerun()
+
+elif menu == "✏️ Edit Data":
+    st.title("✏️ Edit Data Laptop")
+    s_sn = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
+    idx = df[df['Serial Number'] == s_sn].index[0]
+    row = df.loc[idx]
+    with st.form("f_ed"):
+        em = st.text_input("Model", value=row.get('Model', ''))
+        est = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"], index=["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"].index(row.get('Status', 'Tersedia')))
+        if st.form_submit_button("Simpan Perubahan"):
+            up_df = df.copy()
+            up_df.at[idx, 'Model'], up_df.at[idx, 'Status'] = em.strip(), est
+            if save_to_github(up_df):
+                st.session_state.df = up_df
+                st.success("Terupdate!")
+                st.rerun()
+
+elif menu == "❌ Hapus Laptop":
+    st.title("❌ Hapus Laptop")
+    s_del = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
+    if st.button("Ya, Hapus Permanen"):
+        up_df = df.drop(df[df['Serial Number'] == s_del].index[0]).reset_index(drop=True)
+        if save_to_github(up_df):
+            st.session_state.df = up_df
+            st.rerun()
+
+elif menu == "📝 Cetak BAST":
+    st.title("📝 Dokumen BAST")
+    p_sn = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
+    li = df[df['Serial Number'] == p_sn].iloc[0]
+    st.text_area("Pratinjau", value=f"BAST untuk {li.get('User')}\nModel: {li.get('Model')}", height=300)
+
+elif menu == "📋 Audit Log":
+    st.title("📋 Audit Log")
+    for log in st.session_state.audit_log: st.write(log)
