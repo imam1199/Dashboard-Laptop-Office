@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 
-# 1. MENGGANTI NAMA DI TAB BROWSER
 st.set_page_config(page_title="Dashboard IT Asset Umara Group", layout="wide")
 
 # Fungsi untuk membaca data awal dari GitHub CSV
@@ -27,7 +26,6 @@ menu = st.sidebar.radio("Pilih Menu:", ["📊 Dashboard & Analytics", "➕ Tamba
 
 # 1. MENU DASHBOARD & ANALYTICS
 if menu == "📊 Dashboard & Analytics":
-    # 2. MENGGANTI JUDUL UTAMA DI HALAMAN DEPAN
     st.title("📊 Dashboard IT Asset Umara Group")
     st.write("Kelola, pantau, dan analisis grafik inventaris laptop Umara Group secara real-time.")
     
@@ -56,15 +54,23 @@ if menu == "📊 Dashboard & Analytics":
     
     st.markdown("---")
     
-    # SEKSI TABEL DATA
+    # SEKSI TABEL DATA (YANG SUDAH AUTO-STRETCH)
     st.subheader("🔍 Cari & Detail Data Laptop")
     search = st.text_input("Masukkan Model, Serial Number, atau Nama User:")
     
-    if search:
-        mask = df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)
-        st.dataframe(df[mask], use_container_width=True)
-    else:
-        st.dataframe(df, use_container_width=True)
+    # Filter data jika ada pencarian
+    display_df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df
+    
+    # KONFIGURASI KOLOM: Memaksa kolom Notes dan kolom lain melebar otomatis sesuai isi teksnya
+    st.dataframe(
+        display_df, 
+        use_container_width=True,
+        column_config={
+            "Notes": st.column_config.TextColumn("Notes", width="large"),
+            "Model": st.column_config.TextColumn("Model", width="medium"),
+            "Serial Number": st.column_config.TextColumn("Serial Number", width="medium")
+        }
+    )
         
     st.markdown("---")
     
@@ -144,8 +150,4 @@ elif menu == "✏️ Edit / Update Data":
             if save_changes:
                 st.session_state.df.at[idx, 'Model'] = edit_model
                 st.session_state.df.at[idx, 'Bu Owner'] = edit_bu_owner
-                st.session_state.df.at[idx, 'Bu User'] = edit_bu_user
-                st.session_state.df.at[idx, 'Job Title'] = edit_job_title
-                st.session_state.df.at[idx, 'User'] = edit_user
-                st.session_state.df.at[idx, 'Status'] = edit_status
-                st.session_state.df.at[idx, 'Notes'] = edit_notes
+                st.session_state.df.
