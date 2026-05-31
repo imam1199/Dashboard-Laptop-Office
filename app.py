@@ -60,7 +60,6 @@ menu = st.sidebar.radio("Pilih Menu:", [
 if menu == "📊 Dashboard & Analytics":
     st.title("📊 Dashboard IT Asset Umara Group")
     
-    # Filter Status
     all_status = ["Semua"] + st.session_state.df['Status'].unique().tolist()
     filter_status = st.selectbox("🔍 Filter Berdasarkan Status:", all_status)
     display_df = st.session_state.df[st.session_state.df['Status'] == filter_status] if filter_status != "Semua" else st.session_state.df
@@ -72,7 +71,6 @@ if menu == "📊 Dashboard & Analytics":
     c3.metric("🔵 Di Pakai", status_counts.get('Di Pakai', 0))
     c4.metric("🟡 Perbaikan", status_counts.get('Perlu Perbaikan', 0))
     c5.metric("🔴 Rusak", status_counts.get('Rusak', 0))
-    
     st.dataframe(display_df, use_container_width=True)
     
     st.markdown("---")
@@ -113,6 +111,7 @@ elif menu == "✏️ Edit Data":
     s_sn = st.selectbox("Pilih SN:", st.session_state.df['Serial Number'].tolist())
     idx = st.session_state.df[st.session_state.df['Serial Number'] == s_sn].index[0]
     row = st.session_state.df.loc[idx]
+    
     with st.form("f_ed"):
         em = st.text_input("Model", value=row.get('Model', ''))
         ebo = st.selectbox("BU Owner", BU_OPTIONS, index=BU_OPTIONS.index(row.get('Bu Owner')) if row.get('Bu Owner') in BU_OPTIONS else 0)
@@ -124,13 +123,21 @@ elif menu == "✏️ Edit Data":
         ent = st.text_area("Notes", value=row.get('Notes', ''))
         
         if st.form_submit_button("✅ Simpan Perubahan"):
+            # Logika deteksi perubahan
+            changes = []
+            if row['Model'] != em: changes.append(f"Model: {row['Model']} -> {em}")
+            if row['Status'] != est: changes.append(f"Status: {row['Status']} -> {est}")
+            if row['User'] != eus: changes.append(f"User: {row['User']} -> {eus}")
+            if row['Notes'] != ent: changes.append("Notes diupdate")
+            detail_log = f"SN {s_sn}: " + (", ".join(changes) if changes else "Update data umum")
+
             st.session_state.df.at[idx, 'Model'] = em; st.session_state.df.at[idx, 'Bu Owner'] = ebo; st.session_state.df.at[idx, 'Bu User'] = ebu
             st.session_state.df.at[idx, 'Job Title'] = ejt; st.session_state.df.at[idx, 'User'] = eus; st.session_state.df.at[idx, 'Status'] = est
             st.session_state.df.at[idx, 'Tahun Beli'] = etb; st.session_state.df.at[idx, 'Notes'] = ent
             
             if save_to_github(st.session_state.df, FILE_PATH): 
-                add_log("EDIT", f"SN: {s_sn}")
-                st.toast('Perubahan data berhasil disimpan!', icon='💾')
+                add_log("EDIT", detail_log)
+                st.toast('Perubahan berhasil disimpan!', icon='💾')
                 time.sleep(1.5)
                 st.rerun()
 
