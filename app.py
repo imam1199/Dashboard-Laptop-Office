@@ -25,7 +25,6 @@ def load_data(path):
         df.columns = df.columns.str.strip().str.title()
         return df
     except:
-        # Jika file belum ada (terutama audit_log), return DataFrame kosong dengan kolom yang sesuai
         if "audit_log" in path:
             return pd.DataFrame(columns=["Timestamp", "Action", "Detail"])
         return pd.DataFrame()
@@ -74,45 +73,13 @@ if menu == "📊 Dashboard & Analytics":
     c4.metric("🟡 Perbaikan", status_counts.get('Perlu Perbaikan', 0))
     c5.metric("🔴 Rusak", status_counts.get('Rusak', 0))
     st.dataframe(display_df, use_container_width=True)
-    
-    st.markdown("---")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("🔹 Distribusi Status")
-        fig_pie = px.pie(status_counts.reset_index(), values='count', names='Status', hole=0.4)
-        st.plotly_chart(fig_pie, use_container_width=True)
-    with col2:
-        st.subheader("🔹 Top 5 Model Laptop")
-        top_model = st.session_state.df['Model'].value_counts().head(5).reset_index()
-        fig_bar = px.bar(top_model, x='Model', y='count', color='Model')
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-elif menu == "👥 User Directory":
-    st.title("👥 User Directory")
-    users = sorted([u for u in st.session_state.df['User'].unique() if str(u).strip()])
-    s_user = st.selectbox("Pilih User:", users)
-    st.dataframe(st.session_state.df[st.session_state.df['User'] == s_user], use_container_width=True)
-
-elif menu == "➕ Tambah Laptop":
-    st.title("➕ Tambah Laptop Baru")
-    with st.form("f_add"):
-        m = st.text_input("Model"); sn = st.text_input("SN")
-        bo = st.selectbox("BU Owner", BU_OPTIONS); bu = st.selectbox("BU User", BU_OPTIONS)
-        jt = st.text_input("Job Title"); us = st.text_input("User")
-        stt = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"])
-        tb = st.number_input("Tahun Beli", 2015, 2030, 2026); nt = st.text_area("Notes")
-        if st.form_submit_button("💾 Simpan Data"):
-            nr = {"Model": m, "Serial Number": sn, "Bu Owner": bo, "Bu User": bu, "Job Title": jt, "User": us, "Status": stt, "Tahun Beli": tb, "Notes": nt}
-            st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([nr])], ignore_index=True)
-            if save_to_github(st.session_state.df, FILE_PATH): 
-                add_log("TAMBAH", f"SN: {sn}")
-                st.success("Data berhasil ditambahkan!"); st.rerun()
 
 elif menu == "✏️ Edit Data":
     st.title("✏️ Edit Data Laptop")
     s_sn = st.selectbox("Pilih SN:", st.session_state.df['Serial Number'].tolist())
     idx = st.session_state.df[st.session_state.df['Serial Number'] == s_sn].index[0]
     row = st.session_state.df.loc[idx]
+    
     with st.form("f_ed"):
         em = st.text_input("Model", value=row.get('Model', ''))
         ebo = st.selectbox("BU Owner", BU_OPTIONS, index=BU_OPTIONS.index(row.get('Bu Owner')) if row.get('Bu Owner') in BU_OPTIONS else 0)
@@ -129,11 +96,27 @@ elif menu == "✏️ Edit Data":
             if row['Status'] != est: changes.append(f"Status: {row['Status']} -> {est}")
             if row['User'] != eus: changes.append(f"User: {row['User']} -> {eus}")
             if row['Notes'] != ent: changes.append("Notes diupdate")
+            
             detail_log = f"SN {s_sn}: " + (", ".join(changes) if changes else "Update data umum")
             
-            st.session_state.df.at[idx, 'Model'] = em; st.session_state.df.at[idx, 'Bu Owner'] = ebo; st.session_state.df.at[idx, 'Bu User'] = ebu
-            st.session_state.df.at[idx, 'Job Title'] = ejt; st.session_state.df.at[idx, 'User'] = eus; st.session_state.df.at[idx, 'Status'] = est
-            st.session_state.df.at[idx, 'Tahun Beli'] = etb; st.session_state.df.at[idx, 'Notes'] = ent
+            st.session_state.df.at[idx, 'Model'] = em
+            st.session_state.df.at[idx, 'Bu Owner'] = ebo
+            st.session_state.df.at[idx, 'Bu User'] = ebu
+            st.session_state.df.at[idx, 'Job Title'] = ejt
+            st.session_state.df.at[idx, 'User'] = eus
+            st.session_state.df.at[idx, 'Status'] = est
+            st.session_state.df.at[idx, 'Tahun Beli'] = etb
+            st.session_state.df.at[idx, 'Notes'] = ent
             
             if save_to_github(st.session_state.df, FILE_PATH): 
-                add_log("EDIT",
+                add_log("EDIT", detail_log)
+                st.toast('Perubahan berhasil disimpan!', icon='💾')
+                time.sleep(1.5)
+                st.rerun()
+
+elif menu == "📋 Audit Log":
+    st.title("📋 Audit Log")
+    if not st.session_state.audit_df.empty:
+        st.dataframe(st.session_state.audit_df, use_container_width=True)
+    else:
+        st.info("Belum ada data log.")
