@@ -21,39 +21,24 @@ except:
 
 def load_data(path):
     try:
-        # Mencoba membaca dengan titik koma, jika gagal/kolom cuma 1, pakai koma
-        df = pd.read_csv(path, sep=";")
-        if len(df.columns) <= 1:
-            df = pd.read_csv(path, sep=",")
-        return df.fillna("")
+        df = pd.read_csv(path, sep=";").fillna("")
+        df.columns = df.columns.str.strip().str.title()
+        return df
     except:
         if "audit_log" in path:
             return pd.DataFrame(columns=["Timestamp", "Action", "Detail"])
         return pd.DataFrame()
 
 def save_to_github(dataframe, path):
-    if not GITHUB_TOKEN: 
-        st.error("GITHUB_TOKEN tidak ditemukan!")
-        return False
-        
+    if not GITHUB_TOKEN: return False
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    
-    # Ambil SHA file untuk proses update
     res = requests.get(url, headers=headers)
     sha = res.json().get("sha", "") if res.status_code == 200 else ""
-    
-    # Simpan sebagai CSV dengan pemisah koma (lebih standar untuk GitHub)
-    csv_content = dataframe.to_csv(index=False, sep=",") 
+    csv_content = dataframe.to_csv(index=False, sep=";")
     encoded_content = base64.b64encode(csv_content.encode("utf-8")).decode("utf-8")
     payload = {"message": "Update Data", "content": encoded_content, "sha": sha if sha else None}
-    
-    response = requests.put(url, headers=headers, json=payload)
-    if response.status_code in [200, 201]:
-        return True
-    else:
-        st.error(f"Gagal simpan ke GitHub! Code: {response.status_code}")
-        return False
+    return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
 
 # Load Data
 if 'df' not in st.session_state: st.session_state.df = load_data(FILE_PATH)
@@ -69,7 +54,8 @@ def add_log(action, detail):
 # --- SIDEBAR ---
 st.sidebar.title("💻 IT Asset Umara Group")
 menu = st.sidebar.radio("Pilih Menu:", [
-    "📊 Dashboard & Analytics", "✏️ Edit Data", "📋 Audit Log"
+    "📊 Dashboard & Analytics", "👥 User Directory", "➕ Tambah Laptop", 
+    "✏️ Edit Data", "❌ Hapus Laptop", "📝 Cetak BAST", "📋 Audit Log"
 ])
 
 # --- LOGIKA APLIKASI ---
@@ -78,6 +64,14 @@ if menu == "📊 Dashboard & Analytics":
     all_status = ["Semua"] + st.session_state.df['Status'].unique().tolist()
     filter_status = st.selectbox("🔍 Filter Berdasarkan Status:", all_status)
     display_df = st.session_state.df[st.session_state.df['Status'] == filter_status] if filter_status != "Semua" else st.session_state.df
+    
+    status_counts = st.session_state.df['Status'].value_counts()
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("📦 Total", len(st.session_state.df))
+    c2.metric("🟢 Tersedia", status_counts.get('Tersedia', 0))
+    c3.metric("🔵 Di Pakai", status_counts.get('Di Pakai', 0))
+    c4.metric("🟡 Perbaikan", status_counts.get('Perlu Perbaikan', 0))
+    c5.metric("🔴 Rusak", status_counts.get('Rusak', 0))
     st.dataframe(display_df, use_container_width=True)
 
 elif menu == "✏️ Edit Data":
@@ -105,7 +99,6 @@ elif menu == "✏️ Edit Data":
             
             detail_log = f"SN {s_sn}: " + (", ".join(changes) if changes else "Update data umum")
             
-            # Update data
             st.session_state.df.at[idx, 'Model'] = em
             st.session_state.df.at[idx, 'Bu Owner'] = ebo
             st.session_state.df.at[idx, 'Bu User'] = ebu
