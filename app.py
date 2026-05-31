@@ -46,13 +46,18 @@ def save_to_github(dataframe, path):
 if 'df' not in st.session_state: st.session_state.df = load_data(FILE_PATH)
 if 'audit_df' not in st.session_state: st.session_state.audit_df = load_data(LOG_PATH)
 
-def add_log(action, detail):
+ def add_log(action, detail):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     new_log = pd.DataFrame([{"Timestamp": ts, "Action": action, "Detail": detail}])
+    
+    # Gabungkan dengan data log lama
     updated_logs = pd.concat([new_log, st.session_state.audit_df], ignore_index=True)
+    
+    # PENTING: Panggil save_to_github agar log tersimpan permanen
     if save_to_github(updated_logs, LOG_PATH):
         st.session_state.audit_df = updated_logs
-
+    else:
+        st.error("Gagal menyimpan audit log ke GitHub")
 # --- SIDEBAR ---
 st.sidebar.title("💻 IT Asset Umara Group")
 menu = st.sidebar.radio("Pilih Menu:", [
