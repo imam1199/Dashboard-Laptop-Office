@@ -21,12 +21,14 @@ except:
 
 def load_data(path):
     try:
+        # Menambahkan separator ';' untuk memastikan terbaca dengan benar
         df = pd.read_csv(path, sep=";").fillna("")
         df.columns = df.columns.str.strip().str.title()
         return df
-    except:
-        if "audit_log" in path:
-            return pd.DataFrame(columns=["Timestamp", "Action", "Detail"])
+    except Exception as e:
+        # Menampilkan peringatan jika file tidak ada
+        st.warning(f"File {path} tidak ditemukan. Log baru akan dibuat setelah aksi pertama.")
+        return pd.DataFrame(columns=["Timestamp", "Action", "Detail"])
         return pd.DataFrame()
 
 def save_to_github(dataframe, path):
