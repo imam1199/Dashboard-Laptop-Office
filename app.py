@@ -21,15 +21,11 @@ except:
 
 def load_data(path):
     try:
-        # Menambahkan separator ';' untuk memastikan terbaca dengan benar
         df = pd.read_csv(path, sep=";").fillna("")
         df.columns = df.columns.str.strip().str.title()
         return df
-    except Exception as e:
-        # Menampilkan peringatan jika file tidak ada
-        st.warning(f"File {path} tidak ditemukan. Log baru akan dibuat setelah aksi pertama.")
+    except:
         return pd.DataFrame(columns=["Timestamp", "Action", "Detail"])
-        return pd.DataFrame()
 
 def save_to_github(dataframe, path):
     if not GITHUB_TOKEN: return False
@@ -42,22 +38,17 @@ def save_to_github(dataframe, path):
     payload = {"message": "Update Data", "content": encoded_content, "sha": sha if sha else None}
     return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
 
+def add_log(action, detail):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_log = pd.DataFrame([{"Timestamp": ts, "Action": action, "Detail": detail}])
+    updated_logs = pd.concat([new_log, st.session_state.audit_df], ignore_index=True)
+    if save_to_github(updated_logs, LOG_PATH):
+        st.session_state.audit_df = updated_logs
+
 # Load Data
 if 'df' not in st.session_state: st.session_state.df = load_data(FILE_PATH)
 if 'audit_df' not in st.session_state: st.session_state.audit_df = load_data(LOG_PATH)
 
- def add_log(action, detail):
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_log = pd.DataFrame([{"Timestamp": ts, "Action": action, "Detail": detail}])
-    
-    # Gabungkan dengan data log lama
-    updated_logs = pd.concat([new_log, st.session_state.audit_df], ignore_index=True)
-    
-    # PENTING: Panggil save_to_github agar log tersimpan permanen
-    if save_to_github(updated_logs, LOG_PATH):
-        st.session_state.audit_df = updated_logs
-    else:
-        st.error("Gagal menyimpan audit log ke GitHub")
 # --- SIDEBAR ---
 st.sidebar.title("💻 IT Asset Umara Group")
 menu = st.sidebar.radio("Pilih Menu:", [
