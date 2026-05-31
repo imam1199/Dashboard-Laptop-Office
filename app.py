@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import base64
+import time
 from datetime import datetime
 import plotly.express as px
 
@@ -37,9 +38,9 @@ def save_to_github(dataframe, path):
     payload = {"message": "Update Data", "content": encoded_content, "sha": sha if sha else None}
     return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
 
+# Load Data
 if 'df' not in st.session_state: st.session_state.df = load_data(FILE_PATH)
 if 'audit_df' not in st.session_state: st.session_state.audit_df = load_data(LOG_PATH)
-df = st.session_state.df
 
 def add_log(action, detail):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -58,17 +59,20 @@ menu = st.sidebar.radio("Pilih Menu:", [
 # --- LOGIKA APLIKASI ---
 if menu == "📊 Dashboard & Analytics":
     st.title("📊 Dashboard IT Asset Umara Group")
-    all_status = ["Semua"] + df['Status'].unique().tolist()
-    filter_status = st.selectbox("🔍 Filter Berdasarkan Status:", all_status)
-    display_df = df[df['Status'] == filter_status] if filter_status != "Semua" else df
     
-    status_counts = df['Status'].value_counts()
+    # Filter Status
+    all_status = ["Semua"] + st.session_state.df['Status'].unique().tolist()
+    filter_status = st.selectbox("🔍 Filter Berdasarkan Status:", all_status)
+    display_df = st.session_state.df[st.session_state.df['Status'] == filter_status] if filter_status != "Semua" else st.session_state.df
+    
+    status_counts = st.session_state.df['Status'].value_counts()
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("📦 Total", len(df))
+    c1.metric("📦 Total", len(st.session_state.df))
     c2.metric("🟢 Tersedia", status_counts.get('Tersedia', 0))
     c3.metric("🔵 Di Pakai", status_counts.get('Di Pakai', 0))
     c4.metric("🟡 Perbaikan", status_counts.get('Perlu Perbaikan', 0))
     c5.metric("🔴 Rusak", status_counts.get('Rusak', 0))
+    
     st.dataframe(display_df, use_container_width=True)
     
     st.markdown("---")
@@ -79,15 +83,15 @@ if menu == "📊 Dashboard & Analytics":
         st.plotly_chart(fig_pie, use_container_width=True)
     with col2:
         st.subheader("🔹 Top 5 Model Laptop")
-        top_model = df['Model'].value_counts().head(5).reset_index()
+        top_model = st.session_state.df['Model'].value_counts().head(5).reset_index()
         fig_bar = px.bar(top_model, x='Model', y='count', color='Model')
         st.plotly_chart(fig_bar, use_container_width=True)
 
 elif menu == "👥 User Directory":
     st.title("👥 User Directory")
-    users = sorted([u for u in df['User'].unique() if str(u).strip()])
+    users = sorted([u for u in st.session_state.df['User'].unique() if str(u).strip()])
     s_user = st.selectbox("Pilih User:", users)
-    st.dataframe(df[df['User'] == s_user], use_container_width=True)
+    st.dataframe(st.session_state.df[st.session_state.df['User'] == s_user], use_container_width=True)
 
 elif menu == "➕ Tambah Laptop":
     st.title("➕ Tambah Laptop Baru")
@@ -118,13 +122,17 @@ elif menu == "✏️ Edit Data":
         est = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"], index=["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"].index(row.get('Status', 'Tersedia')) if row.get('Status') in ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"] else 0)
         etb = st.number_input("Tahun Beli", 2015, 2030, int(row.get('Tahun Beli', 2026)))
         ent = st.text_area("Notes", value=row.get('Notes', ''))
+        
         if st.form_submit_button("✅ Simpan Perubahan"):
             st.session_state.df.at[idx, 'Model'] = em; st.session_state.df.at[idx, 'Bu Owner'] = ebo; st.session_state.df.at[idx, 'Bu User'] = ebu
             st.session_state.df.at[idx, 'Job Title'] = ejt; st.session_state.df.at[idx, 'User'] = eus; st.session_state.df.at[idx, 'Status'] = est
             st.session_state.df.at[idx, 'Tahun Beli'] = etb; st.session_state.df.at[idx, 'Notes'] = ent
+            
             if save_to_github(st.session_state.df, FILE_PATH): 
                 add_log("EDIT", f"SN: {s_sn}")
-                st.success("Data berhasil diupdate!"); st.rerun()
+                st.toast('Perubahan data berhasil disimpan!', icon='💾')
+                time.sleep(1.5)
+                st.rerun()
 
 elif menu == "❌ Hapus Laptop":
     st.title("❌ Hapus Laptop")
