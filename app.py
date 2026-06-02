@@ -133,6 +133,50 @@ elif menu == "✏️ Edit Data":
         ent = st.text_area("Notes", value=row_data.get('Notes', ''))
         
         if st.form_submit_button("✅ Simpan Perubahan"):
+           # Update data
+            new_df = df.copy()
+            new_df.loc[new_df['Serial Number'] == s_sn, ['Model', 'Bu Owner', 'Bu User', 'Job Title', 'User', 'Status', 'Tahun Beli', 'Notes']] = \
+                [em, ebo, ebu, ejt, eus, est, etb, ent]
+            
+            if save_to_github(new_df, FILE_PATH): 
+                # 1. Update session state
+                st.session_state.df = new_df
+                
+                # 2. Tambahkan log
+                add_log("EDIT", f"SN: {s_sn}")
+                
+                # 3. KUNCI: Bersihkan semua cache agar dashboard memuat data fresh
+                st.cache_data.clear()
+                
+                # 4. Beri notifikasi dan refresh
+                st.success("Data berhasil diupdate dan cache dibersihkan!")
+                st.rerun()
+            if save_to_github(new_df, FILE_PATH): 
+                st.session_state.df = new_df
+                add_log("EDIT", f"SN: {s_sn}")
+                st.success("Data berhasil diperbarui!")
+                st.rerun()
+    
+    # Ambil list SN untuk selectbox
+    list_sn = df['Serial Number'].tolist()
+    s_sn = st.selectbox("Pilih SN:", list_sn)
+    
+    # Ambil data baris tersebut dengan .loc
+    # Kita filter berdasarkan SN, lalu ambil row pertama
+    row_data = df[df['Serial Number'] == s_sn].iloc[0]
+    
+    with st.form("f_ed"):
+        em = st.text_input("Model", value=row_data.get('Model', ''))
+        ebo = st.selectbox("BU Owner", BU_OPTIONS, index=BU_OPTIONS.index(row_data.get('Bu Owner')) if row_data.get('Bu Owner') in BU_OPTIONS else 0)
+        ebu = st.selectbox("BU User", BU_OPTIONS, index=BU_OPTIONS.index(row_data.get('Bu User')) if row_data.get('Bu User') in BU_OPTIONS else 0)
+        ejt = st.text_input("Job Title", value=row_data.get('Job Title', ''))
+        eus = st.text_input("User", value=row_data.get('User', ''))
+        est = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"], 
+                           index=["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"].index(row_data.get('Status', 'Tersedia')) if row_data.get('Status') in ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"] else 0)
+        etb = st.number_input("Tahun Beli", 2015, 2030, int(row_data.get('Tahun Beli', 2026)))
+        ent = st.text_area("Notes", value=row_data.get('Notes', ''))
+        
+        if st.form_submit_button("✅ Simpan Perubahan"):
             # Update dataframe dengan cara mencari index berdasarkan SN yang valid
             new_df = df.copy()
             new_df.loc[new_df['Serial Number'] == s_sn, ['Model', 'Bu Owner', 'Bu User', 'Job Title', 'User', 'Status', 'Tahun Beli', 'Notes']] = \
