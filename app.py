@@ -37,8 +37,11 @@ def save_to_github(dataframe, path):
     payload = {"message": "Update Data", "content": encoded_content, "sha": sha if sha else None}
     return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
 
+# Inisialisasi Session State
 if 'df' not in st.session_state: st.session_state.df = load_data(FILE_PATH)
 if 'audit_df' not in st.session_state: st.session_state.audit_df = load_data(LOG_PATH)
+
+# Selalu ambil df dari session_state agar update selalu sinkron
 df = st.session_state.df
 
 def add_log(action, detail):
@@ -59,11 +62,6 @@ menu = st.sidebar.radio("Pilih Menu:", [
 if menu == "📊 Dashboard & Analytics":
     st.title("📊 Dashboard IT Asset Umara Group")
     
-    # Filter Pencarian Status
-    all_status = ["Semua"] + df['Status'].unique().tolist()
-    filter_status = st.selectbox("🔍 Filter Berdasarkan Status:", all_status)
-    display_df = df[df['Status'] == filter_status] if filter_status != "Semua" else df
-    
     status_counts = df['Status'].value_counts()
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("📦 Total", len(df))
@@ -71,6 +69,10 @@ if menu == "📊 Dashboard & Analytics":
     c3.metric("🔵 Di Pakai", status_counts.get('Di Pakai', 0))
     c4.metric("🟡 Perbaikan", status_counts.get('Perlu Perbaikan', 0))
     c5.metric("🔴 Rusak", status_counts.get('Rusak', 0))
+    
+    all_status = ["Semua"] + df['Status'].unique().tolist()
+    filter_status = st.selectbox("🔍 Filter Berdasarkan Status:", all_status)
+    display_df = df[df['Status'] == filter_status] if filter_status != "Semua" else df
     
     st.dataframe(display_df, use_container_width=True)
     
