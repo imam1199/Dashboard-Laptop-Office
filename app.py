@@ -112,27 +112,37 @@ elif menu == "➕ Tambah Laptop":
 
 elif menu == "✏️ Edit Data":
     st.title("✏️ Edit Data Laptop")
-    s_sn = st.selectbox("Pilih SN:", df['Serial Number'].tolist())
-    idx = df[df['Serial Number'] == s_sn].index[0]
-    row = df.loc[idx]
+    
+    # Ambil list SN untuk selectbox
+    list_sn = df['Serial Number'].tolist()
+    s_sn = st.selectbox("Pilih SN:", list_sn)
+    
+    # Ambil data baris tersebut dengan .loc
+    # Kita filter berdasarkan SN, lalu ambil row pertama
+    row_data = df[df['Serial Number'] == s_sn].iloc[0]
+    
     with st.form("f_ed"):
-        em = st.text_input("Model", value=row.get('Model', ''))
-        ebo = st.selectbox("BU Owner", BU_OPTIONS, index=BU_OPTIONS.index(row.get('Bu Owner')) if row.get('Bu Owner') in BU_OPTIONS else 0)
-        ebu = st.selectbox("BU User", BU_OPTIONS, index=BU_OPTIONS.index(row.get('Bu User')) if row.get('Bu User') in BU_OPTIONS else 0)
-        ejt = st.text_input("Job Title", value=row.get('Job Title', ''))
-        eus = st.text_input("User", value=row.get('User', ''))
-        est = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"], index=["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"].index(row.get('Status', 'Tersedia')) if row.get('Status') in ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"] else 0)
-        etb = st.number_input("Tahun Beli", 2015, 2030, int(row.get('Tahun Beli', 2026)))
-        ent = st.text_area("Notes", value=row.get('Notes', ''))
+        em = st.text_input("Model", value=row_data.get('Model', ''))
+        ebo = st.selectbox("BU Owner", BU_OPTIONS, index=BU_OPTIONS.index(row_data.get('Bu Owner')) if row_data.get('Bu Owner') in BU_OPTIONS else 0)
+        ebu = st.selectbox("BU User", BU_OPTIONS, index=BU_OPTIONS.index(row_data.get('Bu User')) if row_data.get('Bu User') in BU_OPTIONS else 0)
+        ejt = st.text_input("Job Title", value=row_data.get('Job Title', ''))
+        eus = st.text_input("User", value=row_data.get('User', ''))
+        est = st.selectbox("Status", ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"], 
+                           index=["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"].index(row_data.get('Status', 'Tersedia')) if row_data.get('Status') in ["Tersedia", "Di Pakai", "Perlu Perbaikan", "Rusak"] else 0)
+        etb = st.number_input("Tahun Beli", 2015, 2030, int(row_data.get('Tahun Beli', 2026)))
+        ent = st.text_area("Notes", value=row_data.get('Notes', ''))
+        
         if st.form_submit_button("✅ Simpan Perubahan"):
-            up_df = df.copy()
-            up_df.at[idx, 'Model'] = em; up_df.at[idx, 'Bu Owner'] = ebo; up_df.at[idx, 'Bu User'] = ebu
-            up_df.at[idx, 'Job Title'] = ejt; up_df.at[idx, 'User'] = eus; up_df.at[idx, 'Status'] = est
-            up_df.at[idx, 'Tahun Beli'] = etb; up_df.at[idx, 'Notes'] = ent
-            if save_to_github(up_df, FILE_PATH): 
-                st.session_state.df = up_df
+            # Update dataframe dengan cara mencari index berdasarkan SN yang valid
+            new_df = df.copy()
+            new_df.loc[new_df['Serial Number'] == s_sn, ['Model', 'Bu Owner', 'Bu User', 'Job Title', 'User', 'Status', 'Tahun Beli', 'Notes']] = \
+                [em, ebo, ebu, ejt, eus, est, etb, ent]
+            
+            if save_to_github(new_df, FILE_PATH): 
+                st.session_state.df = new_df
                 add_log("EDIT", f"SN: {s_sn}")
-                st.success("Terupdate!"); st.rerun()
+                st.success("Data berhasil diperbarui!")
+                st.rerun()
 
 elif menu == "❌ Hapus Laptop":
     st.title("❌ Hapus Laptop")
